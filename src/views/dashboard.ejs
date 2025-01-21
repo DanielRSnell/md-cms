@@ -3,7 +3,7 @@
 <body>
     <%- include('layouts/base', { 
         title: 'Dashboard',
-        content: /* html */`
+        content: `
             <div class="container mx-auto px-4 py-6">
                 <div class="card bg-base-100 shadow-xl">
                     <div class="card-body">
@@ -31,7 +31,7 @@
                                     <h3 class="font-bold">Connect your GitHub account</h3>
                                     <div class="text-sm">Connect your GitHub account to get started with the CMS.</div>
                                 </div>
-                                <a href="/github/auth/connect" class="btn btn-primary">Connect GitHub</a>
+                                <a href="/github/connect" class="btn btn-primary">Connect GitHub</a>
                             </div>
                         ` : !locals.user.selected_repo ? `
                             <div id="repo-selector" class="space-y-4">
