@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= locals.title || 'Markdown CMS' %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="min-h-screen bg-base-100">
+    <div class="flex flex-col min-h-screen">
+        <nav class="navbar border-b sticky top-0 z-50 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
+            <div class="container mx-auto px-4">
+                <div class="flex-1">
+                    <a href="/" class="text-xl font-bold">Markdown CMS</a>
+                </div>
+                <div class="flex-none gap-4">
+                    <% if (locals.user) { %>
+                        <a href="/dashboard" class="btn btn-ghost">Dashboard</a>
+                        <div class="dropdown dropdown-end">
+                            <label tabindex="0" class="btn btn-ghost">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm"><%= user.email %></span>
+                                    <% if (user.github_username) { %>
+                                        <div class="badge badge-sm">@<%= user.github_username %></div>
+                                    <% } %>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </label>
+                            <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
+                                <li><a href="/dashboard">Dashboard</a></li>
+                                <% if (user.github_id) { %>
+                                    <li>
+                                        <a href="#" onclick="disconnectGitHub(); return false;">
+                                            Disconnect GitHub
+                                        </a>
+                                    </li>
+                                <% } else { %>
+                                    <li>
+                                        <a href="/github/auth/connect">
+                                            Connect GitHub
+                                        </a>
+                                    </li>
+                                <% } %>
+                                <div class="divider my-0"></div>
+                                <li><a href="/auth/logout">Logout</a></li>
+                            </ul>
+                        </div>
+                    <% } else { %>
+                        <a href="/auth/login" class="btn btn-ghost">Login</a>
+                        <a href="/auth/signup" class="btn btn-primary">Sign up</a>
+                    <% } %>
+                </div>
+            </div>
+        </nav>
+        <main class="flex-1 relative">
+            <%- content %>
+        </main>
+        <footer class="footer footer-center p-4 bg-base-200 text-base-content mt-auto">
+            <div>
+                <p>© <%= new Date().getFullYear() %> Markdown CMS</p>
+            </div>
+        </footer>
+    </div>
+    <script>
+        async function disconnectGitHub() {
+            if (!confirm('Are you sure you want to disconnect your GitHub account? This will remove access to your repositories.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/github/auth/disconnect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to disconnect GitHub');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                console.error('Error disconnecting GitHub:', error);
+                alert('Failed to disconnect GitHub account');
+            }
+        }
+    </script>
+</body>
+</html>

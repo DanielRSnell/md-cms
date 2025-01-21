@@ -1,0 +1,166 @@
+<div id="directory-selector" class="space-y-4">
+    <div class="alert alert-info shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+            <h3 class="font-bold">Browse Repository</h3>
+            <div class="text-sm">Navigate to your content directory to create a new project.</div>
+        </div>
+    </div>
+    
+    <div id="file-browser" class="border rounded-lg p-4 min-h-[300px]">
+        <div class="loading loading-spinner loading-lg"></div>
+    </div>
+
+    <div id="project-form" class="hidden space-y-4">
+        <div class="divider">Create Project</div>
+        
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text">Project Name</span>
+                <span class="label-text-alt text-error">Required</span>
+            </label>
+            <input type="text" id="project-name" class="input input-bordered w-full" placeholder="My Project">
+        </div>
+
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text">Description</span>
+                <span class="label-text-alt">Optional</span>
+            </label>
+            <textarea id="project-description" class="textarea textarea-bordered h-24" placeholder="Project description..."></textarea>
+        </div>
+
+        <div class="form-control">
+            <label class="label">
+                <span class="label-text">Content Directory</span>
+            </label>
+            <input type="text" id="content-path" class="input input-bordered w-full" readonly>
+        </div>
+
+        <button onclick="createProject()" class="btn btn-primary w-full">
+            Create Project
+        </button>
+    </div>
+</div>
+
+<script>
+let currentPath = '';
+let selectedRepo = '<%= locals.user.selected_repo %>';
+
+async function loadContents(path = '') {
+    const browser = document.getElementById('file-browser');
+    browser.innerHTML = '<div class="loading loading-spinner loading-lg"></div>';
+
+    try {
+        const [owner, repo] = selectedRepo.split('/');
+        const response = await fetch(`/github/files/contents/${owner}/${repo}/${path}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load contents');
+        }
+        
+        const contents = await response.json();
+        currentPath = path;
+        
+        browser.innerHTML = `
+            ${path ? `
+                <div class="cursor-pointer hover:bg-base-200 p-2 rounded flex items-center mb-4" 
+                     onclick="loadContents('${path.split('/').slice(0, -1).join('/')}')">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
+                    </svg>
+                    Back
+                </div>
+            ` : ''}
+            <div class="space-y-1">
+                ${contents
+                    .sort((a, b) => {
+                        if (a.type === b.type) return a.name.localeCompare(b.name);
+                        return a.type === 'dir' ? -1 : 1;
+                    })
+                    .map(item => {
+                        if (item.type === 'dir') {
+                            return `
+                                <div class="cursor-pointer hover:bg-base-200 p-2 rounded flex items-center justify-between group" 
+                                     onclick="loadContents('${item.path}')">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                        </svg>
+                                        ${item.name}
+                                    </div>
+                                    <button onclick="selectDirectory('${item.path}'); event.stopPropagation();" 
+                                            class="btn btn-primary btn-sm opacity-0 group-hover:opacity-100">
+                                        Select Directory
+                                    </button>
+                                </div>
+                            `;
+                        }
+                        return '';
+                    }).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading contents:', error);
+        browser.innerHTML = `
+            <div class="alert alert-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 01-18 0z" />
+                </svg>
+                <div>
+                    <h3 class="font-bold">Error</h3>
+                    <div class="text-sm">Failed to load repository contents</div>
+                </div>
+                <button onclick="loadContents('${currentPath}')" class="btn btn-sm">Retry</button>
+            </div>
+        `;
+    }
+}
+
+function selectDirectory(path) {
+    document.getElementById('content-path').value = path;
+    document.getElementById('project-form').classList.remove('hidden');
+}
+
+async function createProject() {
+    const name = document.getElementById('project-name').value.trim();
+    const description = document.getElementById('project-description').value.trim();
+    const contentDirectory = document.getElementById('content-path').value;
+
+    if (!name) {
+        alert('Project name is required');
+        return;
+    }
+
+    try {
+        const response = await fetch('/projects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name,
+                description,
+                repository: selectedRepo,
+                contentDirectory
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create project');
+        }
+
+        window.location.reload();
+    } catch (error) {
+        console.error('Error creating project:', error);
+        alert('Failed to create project');
+    }
+}
+
+loadContents();
+</script>

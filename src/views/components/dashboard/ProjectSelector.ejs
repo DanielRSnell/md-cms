@@ -1,0 +1,91 @@
+<div id="project-selector" class="space-y-4">
+    <div class="flex justify-between items-center">
+        <h3 class="text-lg font-bold">Your Projects</h3>
+        <a href="/dashboard/new-project" class="btn btn-primary btn-sm">
+            New Project
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="projects-grid">
+        <div class="loading loading-spinner loading-lg"></div>
+    </div>
+</div>
+
+<script>
+async function loadProjects() {
+    const grid = document.getElementById('projects-grid');
+    
+    try {
+        const response = await fetch('/projects');
+        if (!response.ok) throw new Error('Failed to load projects');
+        
+        const projects = await response.json();
+        
+        if (projects.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full">
+                    <div class="alert alert-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" 
+                             class="stroke-current shrink-0 w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <h3 class="font-bold">No projects yet</h3>
+                            <div class="text-sm">Create your first project to get started.</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = projects.map(project => `
+            <div class="card bg-base-200">
+                <div class="card-body">
+                    <h2 class="card-title">${project.name}</h2>
+                    <p class="text-sm opacity-70">${project.description || 'No description'}</p>
+                    <div class="card-actions justify-end mt-4">
+                        <button onclick="selectProject('${project.id}')" class="btn btn-primary btn-sm">
+                            Open Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        grid.innerHTML = `
+            <div class="col-span-full">
+                <div class="alert alert-error">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" 
+                         fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 01-18 0z" />
+                    </svg>
+                    <div>
+                        <h3 class="font-bold">Error</h3>
+                        <div class="text-sm">Failed to load projects</div>
+                    </div>
+                    <button onclick="loadProjects()" class="btn btn-sm">Retry</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function selectProject(id) {
+    try {
+        const response = await fetch(`/projects/${id}`);
+        if (!response.ok) throw new Error('Failed to load project');
+        
+        const project = await response.json();
+        window.location.href = `/dashboard/project/${project.id}`;
+    } catch (error) {
+        console.error('Error selecting project:', error);
+        alert('Failed to open project');
+    }
+}
+
+loadProjects();
+</script>

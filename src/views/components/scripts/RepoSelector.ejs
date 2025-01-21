@@ -1,0 +1,62 @@
+<script>
+    async function loadRepositories() {
+        try {
+            const response = await fetch('/github/repos/list');
+            if (!response.ok) throw new Error('Failed to load repositories');
+            
+            const repos = await response.json();
+            
+            const select = document.getElementById('repo-select');
+            select.innerHTML = '<option value="">Select a repository</option>' +
+                repos.map(repo => 
+                    `<option value="${repo.full_name}">${repo.full_name}</option>`
+                ).join('');
+
+            select.addEventListener('change', async (e) => {
+                const repo = e.target.value;
+                if (!repo) return;
+
+                try {
+                    const response = await fetch('/github/repos/select', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ repo })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to select repository');
+
+                    const result = await response.json();
+                    if (result.success) {
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    console.error('Error selecting repository:', error);
+                    alert('Failed to select repository');
+                }
+            });
+        } catch (error) {
+            console.error('Error loading repositories:', error);
+            const select = document.getElementById('repo-select');
+            select.innerHTML = '<option value="">Error loading repositories</option>';
+            
+            const repoSelector = document.getElementById('repo-selector');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-error mt-4';
+            errorDiv.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                    <h3 class="font-bold">Error loading repositories</h3>
+                    <div class="text-sm">${error.message}</div>
+                </div>
+                <button onclick="loadRepositories()" class="btn btn-sm">Retry</button>
+            `;
+            repoSelector.appendChild(errorDiv);
+        }
+    }
+
+    loadRepositories();
+</script>
