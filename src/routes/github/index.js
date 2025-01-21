@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
-import { dbGet, dbRun } from '../db.js';
+import { dbGet, dbRun } from '../../db.js';
 import repoRoutes from './repos.js';
 import fileRoutes from './files.js';
 
@@ -8,18 +8,29 @@ const router = Router();
 
 // GitHub OAuth routes
 router.get('/connect', (req, res) => {
-  if (!req.session.user) {
+  if (!req.session?.user?.id) {
+    console.error('No user session found');
     return res.redirect('/auth/login');
   }
   
-  // Generate the GitHub OAuth URL
-  const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
-  githubAuthUrl.searchParams.append('client_id', process.env.GITHUB_CLIENT_ID);
-  githubAuthUrl.searchParams.append('scope', 'repo');
-  githubAuthUrl.searchParams.append('state', req.session.user.id);
+  try {
+    // Generate the GitHub OAuth URL
+    const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
+    githubAuthUrl.searchParams.append('client_id', process.env.GITHUB_CLIENT_ID);
+    githubAuthUrl.searchParams.append('scope', 'repo');
+    githubAuthUrl.searchParams.append('state', req.session.user.id);
 
-  console.log('Redirecting to GitHub:', githubAuthUrl.toString());
-  res.redirect(githubAuthUrl.toString());
+    console.log('Redirecting to GitHub OAuth:', {
+      clientId: process.env.GITHUB_CLIENT_ID,
+      userId: req.session.user.id,
+      url: githubAuthUrl.toString()
+    });
+
+    res.redirect(githubAuthUrl.toString());
+  } catch (error) {
+    console.error('Error initiating GitHub OAuth:', error);
+    res.redirect('/dashboard?error=github_connect_failed');
+  }
 });
 
 router.get('/callback', async (req, res) => {
@@ -31,7 +42,7 @@ router.get('/callback', async (req, res) => {
   }
 
   try {
-    // Exchange code for access token
+    console.log('Exchanging code for access token...');
     const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
@@ -42,31 +53,42 @@ router.get('/callback', async (req, res) => {
       },
     });
 
+    console.log('Token response:', tokenResponse.data);
     const accessToken = tokenResponse.data.access_token;
     
     if (!accessToken) {
       throw new Error('Failed to obtain GitHub access token');
     }
 
-    // Get GitHub user info
+    console.log('Getting GitHub user info...');
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `token ${accessToken}`,
       },
     });
 
+    console.log('User response:', userResponse.data);
     const githubUser = userResponse.data;
 
-    // Update user record with GitHub info
+    if (!githubUser || !githubUser.id) {
+      throw new Error('Invalid GitHub user data received');
+    }
+
+    console.log('Updating user record...');
     await dbRun(
       `UPDATE users 
        SET github_id = ?, github_username = ?, github_access_token = ? 
        WHERE id = ?`,
-      [githubUser.id, githubUser.login, accessToken, state]
+      [githubUser.id.toString(), githubUser.login, accessToken, state]
     );
 
-    // Update session
+    console.log('Getting updated user data...');
     const user = await dbGet('SELECT * FROM users WHERE id = ?', [state]);
+    
+    if (!user) {
+      throw new Error('User not found after update');
+    }
+
     req.session.user = {
       id: user.id,
       email: user.email,
@@ -76,10 +98,15 @@ router.get('/callback', async (req, res) => {
       selected_repo: user.selected_repo
     };
 
+    console.log('GitHub OAuth successful, redirecting to dashboard...');
     res.redirect('/dashboard');
   } catch (error) {
-    console.error('GitHub OAuth Error:', error.response?.data || error.message);
-    res.redirect('/dashboard?error=github_auth_failed');
+    console.error('GitHub OAuth Error:', {
+      message: error.message,
+      response: error.response?.data,
+      stack: error.stack
+    });
+    res.redirect('/dashboard?error=github_auth_failed&message=' + encodeURIComponent(error.message));
   }
 });
 
@@ -112,7 +139,6 @@ router.post('/disconnect', async (req, res) => {
   }
 });
 
-// Mount other routes
 router.use('/repos', repoRoutes);
 router.use('/files', fileRoutes);
 
