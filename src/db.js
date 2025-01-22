@@ -11,12 +11,19 @@ db.serialize(() => {
   db.run('PRAGMA foreign_keys = ON');
   db.run('PRAGMA journal_mode = WAL');
 
-  // Drop existing tables
-  db.run('DROP TABLE IF EXISTS projects');
-  db.run('DROP TABLE IF EXISTS magic_links');
-  db.run('DROP TABLE IF EXISTS users');
+  // Create sessions table first
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY,
+      sess TEXT NOT NULL,
+      expired DATETIME NOT NULL
+    )
+  `);
 
-  // Create users table with selected_repo and content_directory columns
+  // Create index for sessions
+  db.run('CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired)');
+
+  // Rest of the tables...
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -33,7 +40,6 @@ db.serialize(() => {
     )
   `);
 
-  // Create projects table
   db.run(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -48,7 +54,6 @@ db.serialize(() => {
     )
   `);
 
-  // Create magic links table
   db.run(`
     CREATE TABLE IF NOT EXISTS magic_links (
       token TEXT PRIMARY KEY,
@@ -66,7 +71,7 @@ db.serialize(() => {
   db.run('CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_magic_links_user_id ON magic_links(user_id)');
 
-  // Create triggers for updated_at
+  // Create triggers
   db.run(`
     CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
     AFTER UPDATE ON users

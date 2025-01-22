@@ -4,17 +4,24 @@ import { dbGet, dbRun } from '../../db.js';
 
 const router = Router();
 
-// Add this new route at the beginning of the file
 router.get('/connect', (req, res) => {
   if (!req.session.user) {
     return res.redirect('/auth/login');
   }
 
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BASE_URL + '/github/auth/callback')}&scope=repo&state=${req.session.user.id}`;
-  res.redirect(githubAuthUrl);
-});
+  // Simplified authorization URL with exact matching callback
+  const callbackUrl = 'http://localhost:3000/github/auth/callback';
+  console.log('Using callback URL:', callbackUrl); // Debug log
 
-// Existing routes...
+  const authUrl = 'https://github.com/login/oauth/authorize?' +
+    `client_id=${process.env.GITHUB_CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
+    'scope=repo&' +
+    `state=${req.session.user.id}`;
+
+  console.log('Auth URL:', authUrl); // Debug log
+  res.redirect(authUrl);
+});
 
 router.get('/callback', async (req, res) => {
   const { code, state } = req.query;
@@ -25,11 +32,14 @@ router.get('/callback', async (req, res) => {
   }
 
   try {
-    // Exchange code for access token
+    const callbackUrl = 'http://localhost:3000/github/auth/callback';
+    console.log('Callback URL used in token request:', callbackUrl); // Debug log
+
     const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
       code,
+      redirect_uri: callbackUrl
     }, {
       headers: {
         Accept: 'application/json',
@@ -42,7 +52,6 @@ router.get('/callback', async (req, res) => {
       throw new Error('Failed to obtain GitHub access token');
     }
 
-    // Get GitHub user info
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -51,7 +60,6 @@ router.get('/callback', async (req, res) => {
 
     const githubUser = userResponse.data;
 
-    // Update user record with GitHub info
     await dbRun(
       `UPDATE users 
        SET github_id = ?, github_username = ?, github_access_token = ? 
@@ -59,7 +67,6 @@ router.get('/callback', async (req, res) => {
       [githubUser.id, githubUser.login, accessToken, state]
     );
 
-    // Update session
     const user = await dbGet('SELECT * FROM users WHERE id = ?', [state]);
     req.session.user = {
       id: user.id,
