@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ProjectModel } from '../db/models/project.js';
-import { UserModel } from '../db/models/user.js';
 import { requireAuth, requireGitHub } from '../middleware/auth.js';
 
-const projectsRouter = Router();
+const router = Router();
 
 // Get all projects for user
-projectsRouter.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const projects = await ProjectModel.findByUser(req.session.user.id);
     res.json(projects);
@@ -18,12 +17,12 @@ projectsRouter.get('/', requireAuth, async (req, res) => {
 });
 
 // New project form
-projectsRouter.get('/new', requireAuth, requireGitHub, async (req, res) => {
+router.get('/new', requireAuth, requireGitHub, async (req, res) => {
   res.render('projects/new');
 });
 
 // Create new project
-projectsRouter.post('/', requireAuth, requireGitHub, async (req, res) => {
+router.post('/', requireAuth, requireGitHub, async (req, res) => {
   const { name, description, repository } = req.body;
 
   if (!name || !repository) {
@@ -34,18 +33,8 @@ projectsRouter.post('/', requireAuth, requireGitHub, async (req, res) => {
   }
 
   try {
-    // Verify user exists in database
-    const userExists = await UserModel.exists(req.session.user.id);
-    if (!userExists) {
-      console.error('User not found in database:', req.session.user.id);
-      return res.render('projects/new', {
-        error: 'User authentication error. Please try logging in again.',
-        values: { name, description, repository }
-      });
-    }
-
     const projectId = uuidv4();
-    await ProjectModel.create({
+    const project = await ProjectModel.create({
       id: projectId,
       user_id: req.session.user.id,
       name,
@@ -64,7 +53,7 @@ projectsRouter.post('/', requireAuth, requireGitHub, async (req, res) => {
 });
 
 // Directory selection routes
-projectsRouter.get('/:id/select-directory', requireAuth, requireGitHub, async (req, res) => {
+router.get('/:id/select-directory', requireAuth, requireGitHub, async (req, res) => {
   try {
     const project = await ProjectModel.findById(req.params.id);
 
@@ -79,7 +68,7 @@ projectsRouter.get('/:id/select-directory', requireAuth, requireGitHub, async (r
   }
 });
 
-projectsRouter.post('/:id/directory', requireAuth, requireGitHub, async (req, res) => {
+router.post('/:id/directory', requireAuth, requireGitHub, async (req, res) => {
   const { contentDirectory } = req.body;
 
   if (!contentDirectory) {
@@ -102,7 +91,7 @@ projectsRouter.post('/:id/directory', requireAuth, requireGitHub, async (req, re
 });
 
 // Get single project
-projectsRouter.get('/:id', requireAuth, async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const project = await ProjectModel.findById(req.params.id);
 
@@ -118,7 +107,7 @@ projectsRouter.get('/:id', requireAuth, async (req, res) => {
 });
 
 // Delete project
-projectsRouter.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const project = await ProjectModel.findById(req.params.id);
 
@@ -134,4 +123,4 @@ projectsRouter.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
-export { projectsRouter };
+export { router as projectsRouter };

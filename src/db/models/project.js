@@ -12,11 +12,11 @@ export const ProjectModel = {
     );
   },
 
-  async create({ id, user_id, name, description, repository }) {
+  async create({ id, user_id, name, description, repository, content_directory = null }) {
     await dbRun(
-      `INSERT INTO projects (id, user_id, name, description, repository) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [id, user_id, name, description, repository]
+      `INSERT INTO projects (id, user_id, name, description, repository, content_directory) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, user_id, name, description, repository, content_directory]
     );
     return await this.findById(id);
   },

@@ -7,7 +7,16 @@ export const githubConfig = {
   authorizationURL: 'https://github.com/login/oauth/authorize',
   tokenURL: 'https://github.com/login/oauth/access_token',
   callbackURL: `${process.env.BASE_URL}/github/auth/callback`,
-  scope: ['repo', 'read:user', 'user:email'].join(' ')
+  scope: ['repo', 'read:user', 'user:email'].join(' '),
+  getAuthorizationUrl: (state) => {
+    const params = new URLSearchParams({
+      client_id: process.env.GITHUB_CLIENT_ID,
+      redirect_uri: `${process.env.BASE_URL}/github/auth/callback`,
+      scope: ['repo', 'read:user', 'user:email'].join(' '),
+      state: state
+    });
+    return `https://github.com/login/oauth/authorize?${params.toString()}`;
+  }
 };
 
 export const githubApi = axios.create({
@@ -16,14 +25,3 @@ export const githubApi = axios.create({
     Accept: 'application/vnd.github.v3+json'
   }
 });
-
-export function getAuthorizationUrl(state) {
-  const params = new URLSearchParams({
-    client_id: githubConfig.clientId,
-    redirect_uri: githubConfig.callbackURL,
-    scope: githubConfig.scope,
-    state: state
-  });
-
-  return `${githubConfig.authorizationURL}?${params.toString()}`;
-}

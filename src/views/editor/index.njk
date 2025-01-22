@@ -1,0 +1,84 @@
+{% extends "layouts/base.njk" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">{{ project.name }}</h1>
+      {% if project.description %}
+        <p class="text-base-content/70">{{ project.description }}</p>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="badge badge-primary">{{ project.repository }}</div>
+      <div class="badge">{{ project.content_directory }}</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+    <!-- File Browser -->
+    <div class="col-span-12 md:col-span-3">
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Files</h2>
+          <div id="file-browser" class="mt-4">
+            <div class="loading loading-spinner loading-lg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor -->
+    <div class="col-span-12 md:col-span-9">
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <!-- Welcome Screen -->
+          <div id="welcome-screen">
+            <div class="text-center py-16">
+              <h3 class="text-xl font-bold mb-4">Select a file to edit</h3>
+              <p class="text-base-content/70">Choose a markdown file from the file browser to start editing.</p>
+            </div>
+          </div>
+
+          <!-- Editor Container -->
+          <div id="editor-container" class="hidden space-y-6">
+            <!-- Front Matter Editor -->
+            <div>
+              <h3 class="text-lg font-bold mb-2">Front Matter</h3>
+              <textarea id="frontmatter" class="textarea textarea-bordered w-full h-32 font-mono text-sm"></textarea>
+            </div>
+
+            <!-- Content Editor -->
+            <div>
+              <h3 class="text-lg font-bold mb-2">Content</h3>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <textarea id="content" class="textarea textarea-bordered w-full h-[500px] font-mono text-sm"></textarea>
+                </div>
+                <div>
+                  <div id="preview" class="prose bg-base-200 p-4 rounded-lg overflow-auto h-[500px]"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-2">
+              <button id="format-btn" class="btn btn-ghost">Format</button>
+              <button id="save-btn" class="btn btn-primary">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+  // Initialize project info
+  window.selectedRepo = '{{ project.repository }}';
+  window.projectId = '{{ project.id }}';
+  window.contentDirectory = '{{ project.content_directory }}';
+</script>
+<script src="/js/fileEditor.js"></script>
+{% endblock %}

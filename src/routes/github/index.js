@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import authRoutes from './auth.js';
-import repoRoutes from './repos.js';
-import fileRoutes from './files.js';
+import { authRouter } from './auth.js';
+import { reposRouter } from './repos.js';
+import { filesRouter } from './files.js';
 
 const router = Router();
 
-router.use('/auth', authRoutes);
-router.use('/repos', repoRoutes);
-router.use('/files', fileRoutes);
+router.use('/auth', authRouter);
+router.use('/repos', reposRouter);
+router.use('/files', filesRouter);
 
 export { router as githubRouter };

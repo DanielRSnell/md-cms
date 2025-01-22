@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { dbGet, dbRun } from '../../db.js';
 import { requireAuth, requireGitHub } from '../../middleware/auth.js';
-import { githubApi } from '../../utils/github.js';
+import { githubApi } from '../../config/github.js';
 
 const router = Router();
 
@@ -9,14 +9,16 @@ router.get('/list', requireAuth, requireGitHub, async (req, res) => {
   try {
     const response = await githubApi.get('/user/repos', {
       headers: {
-        Authorization: `Bearer ${req.githubToken}`,
+        'Authorization': `Bearer ${req.githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Markdown-CMS'
       },
       params: {
         sort: 'updated',
         per_page: 100,
         visibility: 'all',
-        affiliation: 'owner,collaborator,organization_member',
-      },
+        affiliation: 'owner,collaborator,organization_member'
+      }
     });
 
     const repos = response.data.map(repo => ({
@@ -24,13 +26,16 @@ router.get('/list', requireAuth, requireGitHub, async (req, res) => {
       name: repo.name,
       full_name: repo.full_name,
       default_branch: repo.default_branch,
-      private: repo.private,
+      private: repo.private
     }));
 
     res.json(repos);
   } catch (error) {
-    console.error('Error fetching repos:', error);
-    res.status(500).json({ error: 'Failed to fetch repositories' });
+    console.error('Error fetching repos:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ 
+      error: 'Failed to fetch repositories',
+      details: error.response?.data?.message || error.message
+    });
   }
 });
 
@@ -45,8 +50,10 @@ router.post('/select', requireAuth, requireGitHub, async (req, res) => {
     // Verify repository access
     await githubApi.get(`/repos/${repo}`, {
       headers: {
-        Authorization: `Bearer ${req.githubToken}`,
-      },
+        'Authorization': `Bearer ${req.githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Markdown-CMS'
+      }
     });
 
     // Update user record with selected repo
@@ -67,74 +74,12 @@ router.post('/select', requireAuth, requireGitHub, async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error selecting repo:', error);
-    res.status(500).json({ error: 'Failed to select repository' });
-  }
-});
-
-router.get('/directories/:owner/:repo', requireAuth, requireGitHub, async (req, res) => {
-  const { owner, repo } = req.params;
-
-  try {
-    const response = await githubApi.get(`/repos/${owner}/${repo}/contents`, {
-      headers: {
-        Authorization: `Bearer ${req.githubToken}`,
-      },
+    console.error('Error selecting repo:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ 
+      error: 'Failed to select repository',
+      details: error.response?.data?.message || error.message
     });
-
-    const directories = response.data
-      .filter(item => item.type === 'dir')
-      .map(dir => ({
-        name: dir.name,
-        path: dir.path,
-        type: dir.type
-      }));
-
-    res.json(directories);
-  } catch (error) {
-    console.error('Error fetching directories:', error);
-    res.status(500).json({ error: 'Failed to fetch directories' });
   }
 });
 
-router.post('/set-content-directory', requireAuth, requireGitHub, async (req, res) => {
-  const { directory } = req.body;
-  
-  if (!directory) {
-    return res.status(400).json({ error: 'Directory path is required' });
-  }
-
-  try {
-    const user = await dbGet('SELECT selected_repo FROM users WHERE id = ?', [req.session.user.id]);
-    
-    if (!user.selected_repo) {
-      throw new Error('No repository selected');
-    }
-
-    // Verify directory exists
-    await githubApi.get(`/repos/${user.selected_repo}/contents/${directory}`, {
-      headers: {
-        Authorization: `Bearer ${req.githubToken}`,
-      },
-    });
-
-    // Update user record
-    await dbRun(
-      'UPDATE users SET content_directory = ? WHERE id = ?',
-      [directory, req.session.user.id]
-    );
-    
-    // Update session
-    req.session.user = {
-      ...req.session.user,
-      content_directory: directory
-    };
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error setting content directory:', error);
-    res.status(500).json({ error: 'Failed to set content directory' });
-  }
-});
-
-export { router as default };
+export { router as reposRouter };

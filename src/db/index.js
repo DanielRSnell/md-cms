@@ -19,10 +19,45 @@ const sqlite = sqlite3.verbose();
 // Create database connection
 const db = new sqlite.Database(DB_PATH);
 
-// Promisify database methods
-const dbRun = promisify(db.run.bind(db));
-const dbGet = promisify(db.get.bind(db));
-const dbAll = promisify(db.all.bind(db));
+// Promisify database methods with better error handling
+const dbRun = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) {
+        console.error('Database error in dbRun:', err);
+        reject(err);
+      } else {
+        resolve(this);
+      }
+    });
+  });
+};
+
+const dbGet = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) {
+        console.error('Database error in dbGet:', err);
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
+};
+
+const dbAll = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        console.error('Database error in dbAll:', err);
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+};
 
 // Initialize database
 const initializeDatabase = async () => {
@@ -31,7 +66,7 @@ const initializeDatabase = async () => {
     await dbRun('PRAGMA foreign_keys = ON');
     await dbRun('PRAGMA journal_mode = WAL');
 
-    // Create tables
+    // Create users table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -42,10 +77,12 @@ const initializeDatabase = async () => {
         verified BOOLEAN DEFAULT FALSE,
         github_id TEXT UNIQUE,
         github_username TEXT,
-        github_access_token TEXT
+        github_access_token TEXT,
+        selected_repo TEXT
       )
     `);
 
+    // Create projects table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
@@ -60,6 +97,7 @@ const initializeDatabase = async () => {
       )
     `);
 
+    // Create magic_links table
     await dbRun(`
       CREATE TABLE IF NOT EXISTS magic_links (
         token TEXT PRIMARY KEY,
@@ -77,7 +115,7 @@ const initializeDatabase = async () => {
     await dbRun('CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)');
     await dbRun('CREATE INDEX IF NOT EXISTS idx_magic_links_user_id ON magic_links(user_id)');
 
-    // Create triggers
+    // Create triggers for updated_at
     await dbRun(`
       CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
       AFTER UPDATE ON users

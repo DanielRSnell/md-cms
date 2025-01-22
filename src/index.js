@@ -1,34 +1,17 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import nunjucks from 'nunjucks';
-import { authRouter } from './routes/auth.js';
-import { githubRouter } from './routes/github/index.js';
-import { projectsRouter } from './routes/projects.js';
+import { configureApp } from './config/app.js';
 import { createSessionConfig, validateSessionConfig } from './config/session.js';
-import { db } from './db/index.js';
+import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { setupGracefulShutdown } from './utils/shutdown.js';
+import { router } from './routes/index.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Create Express app
 const app = express();
 
-// Nunjucks setup
-const env = nunjucks.configure('src/views', {
-  autoescape: true,
-  express: app,
-  noCache: process.env.NODE_ENV !== 'production'
-});
-
-// Add custom filter for current year
-env.addFilter('currentYear', () => new Date().getFullYear());
-
-app.set('view engine', 'njk');
-
-// Middleware
-app.use(express.static(join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// Configure app (middleware, view engine, etc.)
+configureApp(app);
 
 // Session configuration
 validateSessionConfig();
@@ -40,61 +23,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.get('/', async (req, res) => {
-  if (req.session.user) {
-    const projects = await db.all(
-      'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
-      [req.session.user.id]
-    );
-    return res.render('dashboard', { projects });
-  }
-  res.render('index');
-});
+// Mount main router
+app.use('/', router);
 
-app.get('/dashboard', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/auth/login');
-  }
-  const projects = await db.all(
-    'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
-    [req.session.user.id]
-  );
-  res.render('dashboard', { projects });
-});
-
-// Route handlers
-app.use('/auth', authRouter);
-app.use('/github', githubRouter);
-app.use('/projects', projectsRouter);
-
-// 404 handler
-app.use((req, res) => {
-  console.log('404 Not Found:', req.method, req.url);
-  res.status(404).render('404');
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).render('error', { 
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Something went wrong!' 
-      : err.message
-  });
-});
+// Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Start server
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  db.close(() => {
-    console.log('Database connection closed.');
-    process.exit(0);
-  });
+// Setup graceful shutdown
+setupGracefulShutdown(server);
+
+// Handle unhandled errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
 });
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+export default app;
