@@ -5,85 +5,422 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ project.name }} - Markdown CMS</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+    <style>
+        :root {
+            --header-height: 3rem;
+            --border-color: hsl(var(--bc) / 0.08);
+            --hover-bg: hsl(var(--bc) / 0.05);
+            --active-bg: hsl(var(--bc) / 0.08);
+            --text-muted: hsl(var(--bc) / 0.7);
+            --radius-sm: 0.25rem;
+            --radius-md: 0.375rem;
+        }
+
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .layout-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: hsl(var(--b1));
+        }
+
+        .header {
+            height: var(--header-height);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: hsl(var(--b1));
+        }
+
+        .header-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: hsl(var(--bc));
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            transition: color 0.15s;
+        }
+
+        .back-link:hover {
+            color: hsl(var(--bc));
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .file-browser-container {
+            width: 12.5%;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            background-color: hsl(var(--b2) / 0.3);
+        }
+
+        .file-browser-header {
+            height: 2.5rem;
+            padding: 0 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .repo-badge {
+            font-size: 0.65rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: var(--radius-sm);
+            background-color: hsl(var(--p) / 0.1);
+            color: hsl(var(--p));
+        }
+
+        .file-browser {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem 0.25rem;
+        }
+
+        .file-browser::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .file-browser::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .file-browser::-webkit-scrollbar-thumb {
+            background: hsl(var(--bc) / 0.1);
+            border-radius: var(--radius-sm);
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: all 0.15s;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background-color: var(--hover-bg);
+            color: hsl(var(--bc));
+        }
+
+        .file-item.active {
+            background-color: var(--active-bg);
+            color: hsl(var(--bc));
+        }
+
+        .file-item svg {
+            width: 0.875rem;
+            height: 0.875rem;
+            opacity: 0.7;
+        }
+
+        .file-item.active svg {
+            opacity: 1;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-badge {
+            font-size: 0.65rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: var(--radius-sm);
+            background-color: var(--hover-bg);
+            color: var(--text-muted);
+        }
+
+        .file-badge.primary {
+            background-color: hsl(var(--p) / 0.1);
+            color: hsl(var(--p));
+        }
+
+        .editor-preview-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .editor-preview-area {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .welcome-screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: hsl(var(--b1));
+            z-index: 10;
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 24rem;
+            padding: 2rem;
+        }
+
+        .welcome-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: hsl(var(--bc));
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-text {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        #editor-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+        }
+
+        .editor-container {
+            flex: 0 0 50%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .editor-tabs {
+            height: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 0.5rem;
+            background-color: hsl(var(--b1));
+        }
+
+        .editor-tab {
+            height: 2.5rem;
+            padding: 0 1rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+            cursor: pointer;
+            background: none;
+            border: none;
+            outline: none;
+        }
+
+        .editor-tab:hover {
+            color: hsl(var(--bc));
+        }
+
+        .editor-tab.active {
+            color: hsl(var(--bc));
+            border-bottom-color: hsl(var(--p));
+        }
+
+        .editor-content {
+            flex: 1;
+            position: relative;
+            background-color: hsl(var(--b1));
+        }
+
+        #markdown-editor,
+        #frontmatter-editor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .preview-container {
+            flex: 0 0 50%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-header {
+            height: 2.5rem;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            background-color: hsl(var(--b1));
+        }
+
+        .preview-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .monaco-editor {
+            padding-top: 0.5rem;
+        }
+
+        .monaco-editor .margin {
+            background-color: hsl(var(--b1));
+        }
+
+        .save-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            height: 2rem;
+            padding: 0 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            background-color: hsl(var(--p));
+            color: hsl(var(--pc));
+            transition: all 0.15s;
+            border: none;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .save-button:hover {
+            background-color: hsl(var(--pf));
+        }
+
+        .save-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .loading-spinner {
+            color: hsl(var(--p));
+        }
+    </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
-    <div class="h-screen flex flex-col">
-        <div class="border-b bg-base-100 px-4 h-14 flex items-center justify-between">
+<body>
+    <div class="layout-container">
+        <header class="header">
             <div class="flex items-center gap-4">
-                <a href="/dashboard" class="btn btn-ghost gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <a href="/dashboard" class="back-link">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                     Dashboard
                 </a>
-                <div class="text-lg font-semibold">{{ project.name }}</div>
+                <span class="header-title">{{ project.name }}</span>
             </div>
-            <div class="flex items-center gap-2">
-                <button id="save-btn" class="btn btn-primary gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    Save
-                </button>
-            </div>
-        </div>
+            <button id="save-btn" class="save-button">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M10 7L6 11L2 7M6 1V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Save
+            </button>
+        </header>
 
-        <div class="flex-1 flex overflow-hidden">
-            <div class="w-64 border-r bg-base-100 flex flex-col">
-                <div class="p-4 border-b font-semibold flex items-center justify-between">
+        <main class="main-content">
+            <div class="file-browser-container">
+                <div class="file-browser-header">
                     <span>Files</span>
-                    <div class="badge badge-primary">{{ project.repository }}</div>
+                    <span class="repo-badge">{{ project.repository.split('/')[1] }}</span>
                 </div>
-                <div id="file-browser" class="flex-1 overflow-y-auto p-2">
-                    <div class="loading loading-spinner loading-lg"></div>
-                </div>
-            </div>
-
-            <div class="flex-1 flex flex-col">
-                <div id="welcome-screen" class="flex-1 flex items-center justify-center">
-                    <div class="text-center">
-                        <h3 class="text-xl font-bold mb-4">Select a file to edit</h3>
-                        <p class="text-base-content/70">Choose a markdown file from the file browser to start editing.</p>
-                    </div>
-                </div>
-
-                <div id="editor-container" class="hidden flex-1 flex">
-                    <div class="flex-1 flex flex-col border-r">
-                        <div class="border-b bg-base-200">
-                            <div class="tabs">
-                                <a class="tab tab-bordered" data-tab="frontmatter" onclick="fileEditor.switchTab('frontmatter')">Front Matter</a>
-                                <a class="tab tab-bordered tab-active" data-tab="markdown" onclick="fileEditor.switchTab('markdown')">Markdown</a>
-                            </div>
-                        </div>
-
-                        <div class="flex-1 flex">
-                            <div id="frontmatter-editor" class="hidden flex-1 flex flex-col">
-                                <textarea id="frontmatter" class="flex-1 font-mono text-sm p-4 bg-base-100 resize-none" spellcheck="false"></textarea>
-                                <div class="p-2 bg-base-200 border-t">
-                                    <button id="format-btn" class="btn btn-sm btn-ghost">Format JSON</button>
-                                </div>
-                            </div>
-
-                            <div id="markdown-editor" class="flex-1 flex flex-col">
-                                <textarea id="content" class="flex-1 font-mono text-sm p-4 bg-base-100 resize-none" spellcheck="false"></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="w-1/2 flex flex-col">
-                        <div class="border-b bg-base-200 p-3 font-semibold">Preview</div>
-                        <div id="preview" class="flex-1 overflow-y-auto p-4 prose prose-sm max-w-none bg-base-100"></div>
+                <div id="file-browser" class="file-browser">
+                    <div class="loading-container">
+                        <div class="loading loading-spinner loading-sm"></div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <div class="editor-preview-container">
+                <div class="editor-preview-area">
+                    <div id="welcome-screen" class="welcome-screen">
+                        <div class="welcome-content">
+                            <h3 class="welcome-title">Select a file to edit</h3>
+                            <p class="welcome-text">Choose a markdown file from the file browser to start editing.</p>
+                        </div>
+                    </div>
+
+                    <div id="editor-container" class="hidden">
+                        <div class="editor-container">
+                            <div class="editor-tabs">
+                                <button class="editor-tab" data-tab="frontmatter">Front Matter</button>
+                                <button class="editor-tab active" data-tab="markdown">Markdown</button>
+                            </div>
+                            <div class="editor-content">
+                                <div id="frontmatter-editor" class="hidden"></div>
+                                <div id="markdown-editor"></div>
+                            </div>
+                        </div>
+
+                        <div class="preview-container">
+                            <div class="preview-header">Preview</div>
+                            <div class="preview-content" data-theme="dark">
+                                <div id="preview" class="prose-sm prose"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>var require = { paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } };</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.nls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.js"></script>
+    
     <script>
         window.selectedRepo = '{{ project.repository }}';
         window.projectId = '{{ project.id }}';
         window.contentDirectory = '{{ project.content_directory }}';
+        
+        window.marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: true,
+            mangle: false,
+            pedantic: false,
+            sanitize: false,
+            smartLists: true,
+            smartypants: true
+        });
     </script>
     <script src="/js/fileEditor.js"></script>
 </body>

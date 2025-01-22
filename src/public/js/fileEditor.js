@@ -5,76 +5,158 @@ class FileEditor {
     this.editor = document.getElementById('editor-container');
     this.fileBrowser = document.getElementById('file-browser');
     this.welcomeScreen = document.getElementById('welcome-screen');
-    this.contentArea = document.getElementById('content');
-    this.frontMatterArea = document.getElementById('frontmatter');
     this.preview = document.getElementById('preview');
     this.saveBtn = document.getElementById('save-btn');
-    this.formatBtn = document.getElementById('format-btn');
     this.currentTab = 'markdown';
-    
-    marked.setOptions({
-      breaks: true,
-      gfm: true,
-      headerIds: true,
-      mangle: false,
-      pedantic: false,
-      sanitize: false,
-      smartLists: true,
-      smartypants: true
+    this.markdownEditor = null;
+    this.frontMatterEditor = null;
+    this.editorTheme = 'vs-dark';
+    this.isInitialized = false;
+    this.marked = window.marked;
+  }
+
+  async init() {
+    try {
+      if (!this.marked) {
+        throw new Error('Marked.js not loaded');
+      }
+      
+      await this.waitForMonaco();
+      await this.initializeMonaco();
+      this.setupEventListeners();
+      this.setupTabSystem();
+      this.isInitialized = true;
+      await this.loadContents();
+    } catch (error) {
+      console.error('Failed to initialize editor:', error);
+      this.showToast('Failed to initialize editor', 'error');
+    }
+  }
+
+  waitForMonaco() {
+    return new Promise((resolve) => {
+      if (window.monaco) {
+        resolve();
+      } else {
+        const checkMonaco = setInterval(() => {
+          if (window.monaco) {
+            clearInterval(checkMonaco);
+            resolve();
+          }
+        }, 100);
+      }
     });
-
-    this.init();
   }
 
-  init() {
-    this.setupEventListeners();
-    this.loadContents();
-    this.setupTabSystem();
-  }
-
-  setupEventListeners() {
-    document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        this.saveFile();
+  async initializeMonaco() {
+    monaco.editor.defineTheme('custom-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#1a1b1e',
+        'editor.foreground': '#d4d4d4',
+        'editor.lineHighlightBackground': '#2f3033',
+        'editor.selectionBackground': '#264f78',
+        'editor.inactiveSelectionBackground': '#3a3d41'
       }
     });
 
-    if (this.formatBtn) {
-      this.formatBtn.addEventListener('click', () => this.formatContent());
-    }
+    this.markdownEditor = monaco.editor.create(document.getElementById('markdown-editor'), {
+      value: '',
+      language: 'markdown',
+      theme: this.editorTheme,
+      minimap: { enabled: false },
+      fontSize: 14,
+      wordWrap: 'on',
+      lineNumbers: 'on',
+      renderWhitespace: 'boundary',
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: 2,
+      rulers: [80],
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true
+      },
+      suggestOnTriggerCharacters: true,
+      wordBasedSuggestions: true,
+      lineDecorationsWidth: 5,
+      lineNumbersMinChars: 3,
+      bracketPairColorization: {
+        enabled: true
+      },
+      padding: {
+        top: 10
+      }
+    });
 
+    this.frontMatterEditor = monaco.editor.create(document.getElementById('frontmatter-editor'), {
+      value: '{\n  \n}',
+      language: 'json',
+      theme: this.editorTheme,
+      minimap: { enabled: false },
+      fontSize: 14,
+      wordWrap: 'on',
+      lineNumbers: 'on',
+      renderWhitespace: 'boundary',
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: 2,
+      formatOnPaste: true,
+      formatOnType: true,
+      padding: {
+        top: 10
+      },
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true
+      },
+      bracketPairColorization: {
+        enabled: true
+      }
+    });
+
+    this.markdownEditor.onDidChangeModelContent(() => {
+      this.updatePreview();
+    });
+
+    this.frontMatterEditor.onDidChangeModelContent(() => {
+      this.validateFrontMatter();
+    });
+
+    this.markdownEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      this.saveFile();
+    });
+
+    this.frontMatterEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      this.saveFile();
+    });
+
+    this.frontMatterEditor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+      this.formatFrontMatter();
+    });
+  }
+
+  setupEventListeners() {
     if (this.saveBtn) {
       this.saveBtn.addEventListener('click', () => this.saveFile());
     }
 
-    if (this.contentArea) {
-      this.contentArea.addEventListener('input', () => this.updatePreview());
-      this.contentArea.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const start = this.contentArea.selectionStart;
-          const end = this.contentArea.selectionEnd;
-          this.contentArea.value = this.contentArea.value.substring(0, start) + '  ' + 
-                                 this.contentArea.value.substring(end);
-          this.contentArea.selectionStart = this.contentArea.selectionEnd = start + 2;
-        }
-      });
-    }
+    window.addEventListener('resize', () => {
+      if (this.markdownEditor) {
+        this.markdownEditor.layout();
+      }
+      if (this.frontMatterEditor) {
+        this.frontMatterEditor.layout();
+      }
+    });
 
-    if (this.frontMatterArea) {
-      this.frontMatterArea.addEventListener('input', () => this.updatePreview());
-      this.frontMatterArea.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const start = this.frontMatterArea.selectionStart;
-          const end = this.frontMatterArea.selectionEnd;
-          this.frontMatterArea.value = this.frontMatterArea.value.substring(0, start) + '  ' + 
-                                     this.frontMatterArea.value.substring(end);
-          this.frontMatterArea.selectionStart = this.frontMatterArea.selectionEnd = start + 2;
-        }
-      });
-    }
+    document.addEventListener('theme-change', () => {
+      this.updateEditorTheme();
+    });
   }
 
   setupTabSystem() {
@@ -96,17 +178,69 @@ class FileEditor {
       }
     });
 
-    document.getElementById('frontmatter-editor').classList.toggle('hidden', tab !== 'frontmatter');
-    document.getElementById('markdown-editor').classList.toggle('hidden', tab !== 'markdown');
+    document.getElementById('frontmatter-editor').style.display = tab === 'frontmatter' ? 'block' : 'none';
+    document.getElementById('markdown-editor').style.display = tab === 'markdown' ? 'block' : 'none';
 
-    if (tab === 'frontmatter') {
-      this.frontMatterArea.focus();
-    } else {
-      this.contentArea.focus();
+    if (tab === 'frontmatter' && this.frontMatterEditor) {
+      this.frontMatterEditor.focus();
+      this.frontMatterEditor.layout();
+    } else if (this.markdownEditor) {
+      this.markdownEditor.focus();
+      this.markdownEditor.layout();
+    }
+  }
+
+  validateFrontMatter() {
+    try {
+      const model = this.frontMatterEditor.getModel();
+      const markers = [];
+      
+      try {
+        JSON.parse(this.frontMatterEditor.getValue());
+      } catch (e) {
+        markers.push({
+          severity: monaco.MarkerSeverity.Error,
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: model.getLineCount(),
+          endColumn: model.getLineMaxColumn(model.getLineCount()),
+          message: 'Invalid JSON: ' + e.message
+        });
+      }
+      
+      monaco.editor.setModelMarkers(model, 'owner', markers);
+    } catch (e) {
+      console.error('Error validating front matter:', e);
+    }
+  }
+
+  formatFrontMatter() {
+    try {
+      const value = this.frontMatterEditor.getValue();
+      const parsed = JSON.parse(value);
+      const formatted = JSON.stringify(parsed, null, 2);
+      this.frontMatterEditor.setValue(formatted);
+      this.showToast('Front matter formatted', 'success');
+    } catch (e) {
+      this.showToast('Invalid JSON in front matter', 'error');
+    }
+  }
+
+  updateEditorTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const theme = isDark ? 'custom-dark' : 'vs';
+    
+    if (this.markdownEditor && this.frontMatterEditor) {
+      this.markdownEditor.updateOptions({ theme });
+      this.frontMatterEditor.updateOptions({ theme });
     }
   }
 
   async loadContents(path = '') {
+    if (!this.isInitialized) {
+      await this.init();
+    }
+
     this.fileBrowser.innerHTML = this.renderLoading();
 
     try {
@@ -233,65 +367,87 @@ class FileEditor {
     `;
   }
 
-  async loadFile(path) {
-    try {
-      const [owner, repo] = window.selectedRepo.split('/');
-      let fullPath = path;
-
-      if (window.contentDirectory && !path.startsWith(window.contentDirectory)) {
-        fullPath = `${window.contentDirectory}/${path}`;
-      }
-
-      const response = await fetch(`/github/files/file/${owner}/${repo}/${fullPath}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || 'Failed to load file');
-      }
-      
-      const { content, frontMatter, sha, type } = await response.json();
-      this.currentFile = { path: fullPath, sha, type };
-      
-      this.welcomeScreen.classList.add('hidden');
-      this.editor.classList.remove('hidden');
-
-      this.contentArea.value = content || '';
-      this.frontMatterArea.value = JSON.stringify(frontMatter || {}, null, 2);
-      
-      this.switchTab('markdown');
-      this.updatePreview();
-      
-      // Refresh file tree to show active file
-      this.loadContents(this.currentPath);
-    } catch (error) {
-      console.error('Error loading file:', error);
-      this.showToast(error.message, 'error');
-      
-      this.welcomeScreen.classList.remove('hidden');
-      this.editor.classList.add('hidden');
+async loadFile(path) {
+    if (!this.isInitialized) {
+        await this.init();
     }
-  }
 
+    try {
+        const [owner, repo] = window.selectedRepo.split('/');
+        let fullPath = path;
+
+        if (window.contentDirectory && !path.startsWith(window.contentDirectory)) {
+            fullPath = `${window.contentDirectory}/${path}`;
+        }
+
+        const response = await fetch(`/github/files/file/${owner}/${repo}/${fullPath}`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.details || error.error || 'Failed to load file');
+        }
+        
+        const { content, frontMatter, sha, type } = await response.json();
+        this.currentFile = { path: fullPath, sha, type };
+        
+        // Hide welcome screen and show editor
+        this.welcomeScreen.style.display = 'none';
+        this.editor.style.display = 'flex';
+
+        this.markdownEditor.setValue(content || '');
+        this.frontMatterEditor.setValue(JSON.stringify(frontMatter || {}, null, 2));
+        
+        monaco.editor.getModels().forEach(model => {
+            monaco.editor.setModelMarkers(model, 'owner', []);
+        });
+        
+        this.switchTab('markdown');
+        this.updatePreview();
+        
+        await this.loadContents(this.currentPath);
+    } catch (error) {
+        console.error('Error loading file:', error);
+        this.showToast(error.message, 'error');
+        
+        // Show welcome screen and hide editor on error
+        this.welcomeScreen.style.display = 'flex';
+        this.editor.style.display = 'none';
+    }
+}
+
+// Add a method to reset the editor state
+resetEditor() {
+    this.currentFile = null;
+    this.welcomeScreen.style.display = 'flex';
+    this.editor.style.display = 'none';
+    if (this.markdownEditor) {
+        this.markdownEditor.setValue('');
+    }
+    if (this.frontMatterEditor) {
+        this.frontMatterEditor.setValue('{\n  \n}');
+    }
+    if (this.preview) {
+        this.preview.innerHTML = '';
+    }
+}
   updatePreview() {
-    if (this.preview && this.contentArea) {
-      this.preview.innerHTML = marked.parse(this.contentArea.value || '');
-    }
-  }
-
-  formatContent() {
-    try {
-      if (this.frontMatterArea) {
-        const frontMatter = JSON.parse(this.frontMatterArea.value);
-        this.frontMatterArea.value = JSON.stringify(frontMatter, null, 2);
-        this.showToast('Front matter formatted', 'success');
-      }
-    } catch (error) {
-      this.showToast('Invalid JSON in front matter', 'error');
+    if (this.preview && this.markdownEditor) {
+      const content = this.markdownEditor.getValue() || '';
+      const html = this.marked.parse(content);
+      this.preview.innerHTML = html;
+      
+      this.preview.querySelectorAll('img').forEach(img => {
+        if (img.src.startsWith('./') || img.src.startsWith('../')) {
+          const basePath = this.currentFile.path.split('/').slice(0, -1).join('/');
+          const absolutePath = new URL(img.src, `${window.location.origin}/${basePath}/`).href;
+          img.src = absolutePath;
+        }
+      });
     }
   }
 
   async saveFile() {
-    if (!this.currentFile) return;
+    if (!this.currentFile || !this.isInitialized) return;
 
     const originalText = this.saveBtn.innerHTML;
     this.saveBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Saving...';
@@ -300,7 +456,7 @@ class FileEditor {
     try {
       let frontMatter = {};
       try {
-        frontMatter = JSON.parse(this.frontMatterArea.value);
+        frontMatter = JSON.parse(this.frontMatterEditor.getValue());
       } catch (e) {
         throw new Error('Invalid JSON in front matter');
       }
@@ -312,7 +468,7 @@ class FileEditor {
         },
         body: JSON.stringify({
           path: this.currentFile.path,
-          content: this.contentArea.value,
+          content: this.markdownEditor.getValue(),
           frontMatter,
           sha: this.currentFile.sha
         })
@@ -327,6 +483,10 @@ class FileEditor {
       if (result.success) {
         this.currentFile.sha = result.sha;
         this.showToast('File saved successfully', 'success');
+        
+        monaco.editor.getModels().forEach(model => {
+          monaco.editor.setModelMarkers(model, 'owner', []);
+        });
       }
     } catch (error) {
       console.error('Error saving file:', error);
@@ -357,4 +517,17 @@ class FileEditor {
   }
 }
 
-window.fileEditor = new FileEditor();
+function initializeEditor() {
+  if (window.marked && window.monaco) {
+    window.fileEditor = new FileEditor();
+    window.fileEditor.init();
+  } else {
+    setTimeout(initializeEditor, 100);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeEditor);
+} else {
+  initializeEditor();
+}
