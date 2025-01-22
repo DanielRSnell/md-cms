@@ -1,0 +1,109 @@
+{% extends "layouts/base.njk" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h2 class="card-title text-2xl mb-6">Settings</h2>
+
+      <div class="divider">GitHub Connections</div>
+      
+      {% if githubAccounts and githubAccounts.length > 0 %}
+        <div class="space-y-4">
+          {% for account in githubAccounts %}
+            <div class="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+              <div class="flex items-center gap-4">
+                <div class="avatar">
+                  <div class="w-12 h-12 rounded-full">
+                    <img src="{{ account.avatar_url }}" alt="{{ account.username }}">
+                  </div>
+                </div>
+                <div>
+                  <h3 class="font-bold">{{ account.username }}</h3>
+                  <p class="text-sm text-base-content/70">Connected on {{ account.connected_at | date }}</p>
+                </div>
+              </div>
+              <button onclick="disconnectGitHub('{{ account.id }}')" class="btn btn-ghost btn-sm text-error">
+                Disconnect
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="mt-4">
+        <a href="/github/auth/connect" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Connect Another GitHub Account
+        </a>
+      </div>
+
+      <div class="divider">Account Settings</div>
+      
+      <div class="form-control w-full max-w-md">
+        <label class="label">
+          <span class="label-text">Email Address</span>
+        </label>
+        <input type="email" value="{{ user.email }}" class="input input-bordered" disabled>
+        <label class="label">
+          <span class="label-text-alt">Email cannot be changed</span>
+        </label>
+      </div>
+
+      <div class="mt-4">
+        <button onclick="resetPassword()" class="btn btn-outline btn-warning">
+          Reset Password
+        </button>
+      </div>
+
+      <div class="divider">Danger Zone</div>
+
+      <div class="bg-error/10 rounded-lg p-4">
+        <h3 class="font-bold text-error mb-2">Delete Account</h3>
+        <p class="text-sm mb-4">Once you delete your account, there is no going back. Please be certain.</p>
+        <button onclick="deleteAccount()" class="btn btn-error">Delete Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function disconnectGitHub(accountId) {
+  if (!confirm('Are you sure you want to disconnect this GitHub account? This will remove access to associated repositories.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/github/auth/disconnect/${accountId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to disconnect GitHub account');
+    }
+
+    window.location.reload();
+  } catch (error) {
+    console.error('Error disconnecting GitHub:', error);
+    alert('Failed to disconnect GitHub account');
+  }
+}
+
+function resetPassword() {
+  window.location.href = '/auth/reset-password';
+}
+
+function deleteAccount() {
+  if (!confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.')) {
+    return;
+  }
+
+  // Add account deletion logic here
+}
+</script>
+{% endblock %}

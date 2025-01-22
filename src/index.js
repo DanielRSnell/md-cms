@@ -1,23 +1,23 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
-import SQLiteStore from 'connect-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import nunjucks from 'nunjucks';
 import { authRouter } from './routes/auth.js';
 import { githubRouter } from './routes/github/index.js';
 import { projectsRouter } from './routes/projects.js';
-import { db } from './db.js';
+import { createSessionConfig, validateSessionConfig } from './config/session.js';
+import { db } from './db/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
-const SQLiteStoreSession = SQLiteStore(session);
 
 // Nunjucks setup
 const env = nunjucks.configure('src/views', {
   autoescape: true,
-  express: app
+  express: app,
+  noCache: process.env.NODE_ENV !== 'production'
 });
 
 // Add custom filter for current year
@@ -31,22 +31,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // Session configuration
-app.use(session({
-  store: new SQLiteStoreSession({ 
-    db: 'sessions.db',
-    concurrentDB: true
-  }),
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
-  },
-  name: 'sessionId'
-}));
+validateSessionConfig();
+app.use(session(createSessionConfig(process.env.NODE_ENV === 'production')));
 
 // Make user available to all templates
 app.use((req, res, next) => {
@@ -55,23 +41,26 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
   if (req.session.user) {
-    return res.redirect('/dashboard');
+    const projects = await db.all(
+      'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
+      [req.session.user.id]
+    );
+    return res.render('dashboard', { projects });
   }
-  res.render('index.njk');
+  res.render('index');
 });
 
-// Auth middleware
-const requireAuth = (req, res, next) => {
+app.get('/dashboard', async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/auth/login');
   }
-  next();
-};
-
-app.get('/dashboard', requireAuth, (req, res) => {
-  res.render('dashboard.njk');
+  const projects = await db.all(
+    'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
+    [req.session.user.id]
+  );
+  res.render('dashboard', { projects });
 });
 
 // Route handlers
@@ -82,17 +71,16 @@ app.use('/projects', projectsRouter);
 // 404 handler
 app.use((req, res) => {
   console.log('404 Not Found:', req.method, req.url);
-  res.status(404).render('404.njk');
+  res.status(404).render('404');
 });
 
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).render('error.njk', { 
+  res.status(500).render('error', { 
     error: process.env.NODE_ENV === 'production' 
       ? 'Something went wrong!' 
-      : err.message,
-    title: 'Error'
+      : err.message
   });
 });
 

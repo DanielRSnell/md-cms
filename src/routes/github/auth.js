@@ -1,116 +1,24 @@
-import { Router } from 'express';
-import axios from 'axios';
-import { dbGet, dbRun } from '../../db.js';
+// Update the GitHub callback handler
+// After successful GitHub authentication:
+await dbRun(
+  `UPDATE users 
+   SET github_id = ?, github_username = ?, github_access_token = ? 
+   WHERE id = ?`,
+  [githubUser.id, githubUser.login, accessToken, state]
+);
 
-const router = Router();
+const user = await dbGet('SELECT * FROM users WHERE id = ?', [state]);
+req.session.user = {
+  id: user.id,
+  email: user.email,
+  github_id: user.github_id,
+  github_username: user.github_username,
+  github_access_token: user.github_access_token
+};
 
-router.get('/connect', (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/auth/login');
+req.session.save((err) => {
+  if (err) {
+    console.error('Session save error:', err);
   }
-
-  // Simplified authorization URL with exact matching callback
-  const callbackUrl = 'http://localhost:3000/github/auth/callback';
-  console.log('Using callback URL:', callbackUrl); // Debug log
-
-  const authUrl = 'https://github.com/login/oauth/authorize?' +
-    `client_id=${process.env.GITHUB_CLIENT_ID}&` +
-    `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
-    'scope=repo&' +
-    `state=${req.session.user.id}`;
-
-  console.log('Auth URL:', authUrl); // Debug log
-  res.redirect(authUrl);
+  res.redirect('/dashboard');
 });
-
-router.get('/callback', async (req, res) => {
-  const { code, state } = req.query;
-
-  if (!code || !state) {
-    console.error('Missing code or state in callback');
-    return res.redirect('/dashboard?error=invalid_github_callback');
-  }
-
-  try {
-    const callbackUrl = 'http://localhost:3000/github/auth/callback';
-    console.log('Callback URL used in token request:', callbackUrl); // Debug log
-
-    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code,
-      redirect_uri: callbackUrl
-    }, {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-
-    const accessToken = tokenResponse.data.access_token;
-    
-    if (!accessToken) {
-      throw new Error('Failed to obtain GitHub access token');
-    }
-
-    const userResponse = await axios.get('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    const githubUser = userResponse.data;
-
-    await dbRun(
-      `UPDATE users 
-       SET github_id = ?, github_username = ?, github_access_token = ? 
-       WHERE id = ?`,
-      [githubUser.id, githubUser.login, accessToken, state]
-    );
-
-    const user = await dbGet('SELECT * FROM users WHERE id = ?', [state]);
-    req.session.user = {
-      id: user.id,
-      email: user.email,
-      github_id: user.github_id,
-      github_username: user.github_username,
-      github_access_token: user.github_access_token,
-      selected_repo: user.selected_repo
-    };
-
-    res.redirect('/dashboard');
-  } catch (error) {
-    console.error('GitHub OAuth Error:', error.response?.data || error.message);
-    res.redirect('/dashboard?error=github_auth_failed');
-  }
-});
-
-router.post('/disconnect', async (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-
-  try {
-    await dbRun(
-      `UPDATE users 
-       SET github_id = NULL, 
-           github_username = NULL, 
-           github_access_token = NULL, 
-           selected_repo = NULL
-       WHERE id = ?`,
-      [req.session.user.id]
-    );
-
-    const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.user.id]);
-    req.session.user = {
-      id: user.id,
-      email: user.email
-    };
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error disconnecting GitHub:', error);
-    res.status(500).json({ error: 'Failed to disconnect GitHub account' });
-  }
-});
-
-export { router as default };

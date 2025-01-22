@@ -1,17 +1,15 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbRun, dbAll } from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { ProjectModel } from '../db/models/project.js';
+import { UserModel } from '../db/models/user.js';
+import { requireAuth, requireGitHub } from '../middleware/auth.js';
 
-const router = Router();
+const projectsRouter = Router();
 
 // Get all projects for user
-router.get('/', requireAuth, async (req, res) => {
+projectsRouter.get('/', requireAuth, async (req, res) => {
   try {
-    const projects = await dbAll(
-      'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC',
-      [req.session.user.id]
-    );
+    const projects = await ProjectModel.findByUser(req.session.user.id);
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -19,39 +17,96 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// Create new project
-router.post('/', requireAuth, async (req, res) => {
-  const { name, description, repository, contentDirectory } = req.body;
+// New project form
+projectsRouter.get('/new', requireAuth, requireGitHub, async (req, res) => {
+  res.render('projects/new');
+});
 
-  if (!name || !repository || !contentDirectory) {
-    return res.status(400).json({ error: 'Name, repository, and content directory are required' });
+// Create new project
+projectsRouter.post('/', requireAuth, requireGitHub, async (req, res) => {
+  const { name, description, repository } = req.body;
+
+  if (!name || !repository) {
+    return res.render('projects/new', { 
+      error: 'Name and repository are required',
+      values: { name, description, repository }
+    });
   }
 
   try {
-    const projectId = uuidv4();
-    await dbRun(
-      `INSERT INTO projects (id, user_id, name, description, repository, content_directory) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [projectId, req.session.user.id, name, description, repository, contentDirectory]
-    );
+    // Verify user exists in database
+    const userExists = await UserModel.exists(req.session.user.id);
+    if (!userExists) {
+      console.error('User not found in database:', req.session.user.id);
+      return res.render('projects/new', {
+        error: 'User authentication error. Please try logging in again.',
+        values: { name, description, repository }
+      });
+    }
 
-    const project = await dbGet('SELECT * FROM projects WHERE id = ?', [projectId]);
-    res.json(project);
+    const projectId = uuidv4();
+    await ProjectModel.create({
+      id: projectId,
+      user_id: req.session.user.id,
+      name,
+      description,
+      repository
+    });
+
+    res.redirect(`/projects/${projectId}/select-directory`);
   } catch (error) {
     console.error('Error creating project:', error);
-    res.status(500).json({ error: 'Failed to create project' });
+    res.render('projects/new', {
+      error: 'Failed to create project. Please try again.',
+      values: { name, description, repository }
+    });
+  }
+});
+
+// Directory selection routes
+projectsRouter.get('/:id/select-directory', requireAuth, requireGitHub, async (req, res) => {
+  try {
+    const project = await ProjectModel.findById(req.params.id);
+
+    if (!project || project.user_id !== req.session.user.id) {
+      return res.redirect('/dashboard');
+    }
+
+    res.render('projects/select-directory', { project });
+  } catch (error) {
+    console.error('Error loading directory selector:', error);
+    res.status(500).render('error', { error: 'Failed to load directory selector' });
+  }
+});
+
+projectsRouter.post('/:id/directory', requireAuth, requireGitHub, async (req, res) => {
+  const { contentDirectory } = req.body;
+
+  if (!contentDirectory) {
+    return res.status(400).json({ error: 'Content directory is required' });
+  }
+
+  try {
+    const project = await ProjectModel.findById(req.params.id);
+
+    if (!project || project.user_id !== req.session.user.id) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    await ProjectModel.updateContentDirectory(req.params.id, contentDirectory);
+    res.redirect(`/editor/${req.params.id}`);
+  } catch (error) {
+    console.error('Error setting content directory:', error);
+    res.status(500).json({ error: 'Failed to set content directory' });
   }
 });
 
 // Get single project
-router.get('/:id', requireAuth, async (req, res) => {
+projectsRouter.get('/:id', requireAuth, async (req, res) => {
   try {
-    const project = await dbGet(
-      'SELECT * FROM projects WHERE id = ? AND user_id = ?',
-      [req.params.id, req.session.user.id]
-    );
+    const project = await ProjectModel.findById(req.params.id);
 
-    if (!project) {
+    if (!project || project.user_id !== req.session.user.id) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
@@ -62,50 +117,16 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Update project
-router.put('/:id', requireAuth, async (req, res) => {
-  const { name, description } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  try {
-    const project = await dbGet(
-      'SELECT * FROM projects WHERE id = ? AND user_id = ?',
-      [req.params.id, req.session.user.id]
-    );
-
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
-    await dbRun(
-      'UPDATE projects SET name = ?, description = ? WHERE id = ?',
-      [name, description, req.params.id]
-    );
-
-    const updatedProject = await dbGet('SELECT * FROM projects WHERE id = ?', [req.params.id]);
-    res.json(updatedProject);
-  } catch (error) {
-    console.error('Error updating project:', error);
-    res.status(500).json({ error: 'Failed to update project' });
-  }
-});
-
 // Delete project
-router.delete('/:id', requireAuth, async (req, res) => {
+projectsRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const project = await dbGet(
-      'SELECT * FROM projects WHERE id = ? AND user_id = ?',
-      [req.params.id, req.session.user.id]
-    );
+    const project = await ProjectModel.findById(req.params.id);
 
-    if (!project) {
+    if (!project || project.user_id !== req.session.user.id) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    await dbRun('DELETE FROM projects WHERE id = ?', [req.params.id]);
+    await ProjectModel.delete(req.params.id);
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting project:', error);
@@ -113,4 +134,4 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
-export { router as projectsRouter };
+export { projectsRouter };

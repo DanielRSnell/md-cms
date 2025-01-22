@@ -1,0 +1,98 @@
+{% extends "layouts/base.njk" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title text-2xl mb-6">Create New Project</h2>
+
+        {% if error %}
+          <div class="alert alert-error mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ error }}</span>
+          </div>
+        {% endif %}
+
+        <form action="/projects" method="POST" class="space-y-6">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Project Name</span>
+              <span class="label-text-alt text-error">Required</span>
+            </label>
+            <input 
+              type="text" 
+              name="name" 
+              class="input input-bordered" 
+              value="{{ values.name if values else '' }}"
+              required
+            >
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Description</span>
+              <span class="label-text-alt">Optional</span>
+            </label>
+            <textarea 
+              name="description" 
+              class="textarea textarea-bordered h-24"
+            >{{ values.description if values else '' }}</textarea>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">GitHub Repository</span>
+              <span class="label-text-alt text-error">Required</span>
+            </label>
+            <select 
+              id="repository" 
+              name="repository" 
+              class="select select-bordered" 
+              required
+            >
+              <option value="">Select a repository...</option>
+            </select>
+          </div>
+
+          <div class="card-actions justify-end mt-6">
+            <a href="/dashboard" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Create Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadRepositories() {
+  try {
+    const response = await fetch('/github/repos/list');
+    if (!response.ok) throw new Error('Failed to load repositories');
+    
+    const repos = await response.json();
+    const select = document.getElementById('repository');
+    const selectedRepo = '{{ values.repository if values else '' }}';
+    
+    select.innerHTML = `
+      <option value="">Select a repository...</option>
+      ${repos.map(repo => `
+        <option value="${repo.full_name}" ${repo.full_name === selectedRepo ? 'selected' : ''}>
+          ${repo.full_name}
+        </option>
+      `).join('')}
+    `;
+  } catch (error) {
+    console.error('Error loading repositories:', error);
+    const select = document.getElementById('repository');
+    select.innerHTML = '<option value="">Error loading repositories</option>';
+    select.classList.add('select-error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadRepositories);
+</script>
+{% endblock %}
