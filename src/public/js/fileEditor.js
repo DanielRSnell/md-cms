@@ -171,10 +171,10 @@ class FileEditor {
   switchTab(tab) {
     this.currentTab = tab;
     
-    document.querySelectorAll('.tab').forEach(t => {
-      t.classList.remove('tab-active');
+    document.querySelectorAll('.editor-tab').forEach(t => {
+      t.classList.remove('active');
       if (t.dataset.tab === tab) {
-        t.classList.add('tab-active');
+        t.classList.add('active');
       }
     });
 
@@ -272,8 +272,8 @@ class FileEditor {
 
   renderLoading() {
     return `
-      <div class="flex items-center justify-center h-40">
-        <div class="loading loading-spinner loading-lg"></div>
+      <div class="loading-container">
+        <div class="loading loading-spinner loading-sm"></div>
       </div>
     `;
   }
@@ -284,14 +284,33 @@ class FileEditor {
         if (a.type === b.type) return a.name.localeCompare(b.name);
         return a.type === 'dir' ? -1 : 1;
       })
-      .map(item => this.renderFileItem(item))
-      .join('');
+      .reduce((acc, item) => {
+        if (item.type === 'dir' || item.name.endsWith('.md') || item.name.endsWith('.mdx')) {
+          acc.push(this.renderFileItem(item));
+        }
+        return acc;
+      }, []);
+
+    const parentPath = path.split('/').slice(0, -1).join('/');
+    const showBack = path && (!window.contentDirectory || path !== window.contentDirectory);
 
     return `
-      ${path ? this.renderBackButton(path) : ''}
-      <div class="space-y-1">
-        ${items}
+      ${showBack ? this.renderBackButton(parentPath) : ''}
+      ${path ? `<div class="directory-label">${path.split('/').pop()}</div>` : ''}
+      <div class="space-y-0">
+        ${items.join('')}
       </div>
+    `;
+  }
+
+  renderBackButton(path) {
+    return `
+      <button class="back-button" onclick="fileEditor.loadContents('${path}')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l-4-4m0 0L7 10m4-4v9" />
+        </svg>
+        Back
+      </button>
     `;
   }
 
@@ -303,51 +322,24 @@ class FileEditor {
     if (item.type === 'dir') {
       return `
         <div class="file-item" onclick="fileEditor.loadContents('${relativePath}')">
-          <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
           </svg>
-          <span class="flex-1">${item.name}</span>
+          <span class="file-name">${item.name}</span>
         </div>
       `;
     }
 
-    if (item.name.endsWith('.md') || item.name.endsWith('.mdx')) {
-      const isMDX = item.name.endsWith('.mdx');
-      return `
-        <div class="file-item ${this.currentFile?.path === item.path ? 'active' : ''}" 
-             onclick="fileEditor.loadFile('${relativePath}')">
-          <svg class="w-4 h-4 ${isMDX ? 'text-primary' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span class="flex-1">${item.name}</span>
-          <span class="badge badge-sm ${isMDX ? 'badge-primary' : 'badge-ghost'}">
-            ${isMDX ? 'MDX' : 'MD'}
-          </span>
-        </div>
-      `;
-    }
-
-    return '';
-  }
-
-  renderBackButton(path) {
-    let parentPath = path.split('/').slice(0, -1).join('/');
-    
-    if (window.contentDirectory && path === window.contentDirectory) {
-      parentPath = '';
-    }
-    
+    const isMDX = item.name.endsWith('.mdx');
     return `
-      <div class="file-item mb-2" onclick="fileEditor.loadContents('${parentPath}')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
+      <div class="file-item ${this.currentFile?.path === item.path ? 'active' : ''}" 
+           onclick="fileEditor.loadFile('${relativePath}')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        Back
+        <span class="file-name">${item.name}</span>
+        ${isMDX ? '<span class="file-badge primary">MDX</span>' : ''}
       </div>
-      <div class="divider my-2"></div>
     `;
   }
 
@@ -367,69 +359,64 @@ class FileEditor {
     `;
   }
 
-async loadFile(path) {
+  async loadFile(path) {
     if (!this.isInitialized) {
-        await this.init();
+      await this.init();
     }
 
     try {
-        const [owner, repo] = window.selectedRepo.split('/');
-        let fullPath = path;
+      const [owner, repo] = window.selectedRepo.split('/');
+      let fullPath = path;
 
-        if (window.contentDirectory && !path.startsWith(window.contentDirectory)) {
-            fullPath = `${window.contentDirectory}/${path}`;
-        }
+      if (window.contentDirectory && !path.startsWith(window.contentDirectory)) {
+        fullPath = `${window.contentDirectory}/${path}`;
+      }
 
-        const response = await fetch(`/github/files/file/${owner}/${repo}/${fullPath}`);
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.details || error.error || 'Failed to load file');
-        }
-        
-        const { content, frontMatter, sha, type } = await response.json();
-        this.currentFile = { path: fullPath, sha, type };
-        
-        // Hide welcome screen and show editor
-        this.welcomeScreen.style.display = 'none';
-        this.editor.style.display = 'flex';
+      const response = await fetch(`/github/files/file/${owner}/${repo}/${fullPath}`);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'Failed to load file');
+      }
+      
+      const { content, frontMatter, sha, type } = await response.json();
+      this.currentFile = { path: fullPath, sha, type };
+      
+      this.welcomeScreen.style.display = 'none';
+      this.editor.style.display = 'flex';
 
-        this.markdownEditor.setValue(content || '');
-        this.frontMatterEditor.setValue(JSON.stringify(frontMatter || {}, null, 2));
-        
-        monaco.editor.getModels().forEach(model => {
-            monaco.editor.setModelMarkers(model, 'owner', []);
-        });
-        
-        this.switchTab('markdown');
-        this.updatePreview();
-        
-        await this.loadContents(this.currentPath);
+      this.markdownEditor.setValue(content || '');
+      this.frontMatterEditor.setValue(JSON.stringify(frontMatter || {}, null, 2));
+      
+      monaco.editor.getModels().forEach(model => {
+        monaco.editor.setModelMarkers(model, 'owner', []);
+      });
+      
+      this.switchTab('markdown');
+      this.updatePreview();
+      
+      await this.loadContents(this.currentPath);
     } catch (error) {
-        console.error('Error loading file:', error);
-        this.showToast(error.message, 'error');
-        
-        // Show welcome screen and hide editor on error
-        this.welcomeScreen.style.display = 'flex';
-        this.editor.style.display = 'none';
+      console.error('Error loading file:', error);
+      this.showToast(error.message, 'error');
     }
-}
+  }
 
-// Add a method to reset the editor state
-resetEditor() {
+  resetEditor() {
     this.currentFile = null;
     this.welcomeScreen.style.display = 'flex';
     this.editor.style.display = 'none';
     if (this.markdownEditor) {
-        this.markdownEditor.setValue('');
+      this.markdownEditor.setValue('');
     }
     if (this.frontMatterEditor) {
-        this.frontMatterEditor.setValue('{\n  \n}');
+      this.frontMatterEditor.setValue('{\n  \n}');
     }
     if (this.preview) {
-        this.preview.innerHTML = '';
+      this.preview.innerHTML = '';
     }
-}
+  }
+
   updatePreview() {
     if (this.preview && this.markdownEditor) {
       const content = this.markdownEditor.getValue() || '';

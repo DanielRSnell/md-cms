@@ -1,0 +1,30 @@
+<div class="editor-preview-container">
+    <div class="editor-preview-area">
+        <div id="welcome-screen" class="welcome-screen">
+            <div class="welcome-content">
+                <h3 class="welcome-title">Select a file to edit</h3>
+                <p class="welcome-text">Choose a markdown file from the file browser to start editing.</p>
+            </div>
+        </div>
+
+        <div id="editor-container">
+            <div class="editor-container">
+                <div class="editor-tabs">
+                    <button class="editor-tab" data-tab="frontmatter">Front Matter</button>
+                    <button class="editor-tab active" data-tab="markdown">Markdown</button>
+                </div>
+                <div class="editor-content">
+                    <div id="frontmatter-editor"></div>
+                    <div id="markdown-editor"></div>
+                </div>
+            </div>
+
+            <div class="preview-container">
+                <div class="preview-header">Preview</div>
+                <div class="preview-content">
+                    <div id="preview" class="prose prose-sm"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
