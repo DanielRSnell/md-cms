@@ -3,37 +3,45 @@
 @tailwind utilities;
 
 :root {
-  --navbar-height: 4rem;
-  --footer-height: 3rem;
+  --editor-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
-.min-h-content {
-  min-height: calc(100vh - var(--navbar-height) - var(--footer-height));
-}
-
-.markdown-content {
-  @apply prose prose-sm sm:prose lg:prose-lg max-w-none;
-  @apply prose-headings:scroll-mt-20;
-  @apply prose-a:text-primary hover:prose-a:text-primary/80;
-  @apply prose-code:bg-base-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded;
-  @apply prose-pre:bg-base-200;
-}
-
-.dropdown .dropdown-content {
-  @apply z-50;
+body {
+  @apply overflow-hidden;
 }
 
 .editor-pane {
-  @apply font-mono text-sm;
-  tab-size: 2;
+  font-family: var(--editor-font);
+  @apply text-sm;
 }
 
 .preview-pane {
-  @apply markdown-content bg-base-200 p-4 rounded-lg overflow-auto;
+  @apply prose prose-sm max-w-none;
+}
+
+.preview-pane pre {
+  @apply bg-base-200 p-4 rounded-lg;
+}
+
+.preview-pane code {
+  @apply bg-base-200 px-1 py-0.5 rounded;
+}
+
+.file-item {
+  @apply flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-base-200 cursor-pointer transition-colors duration-200;
+}
+
+.file-item.active {
+  @apply bg-base-200;
+}
+
+.file-item svg {
+  @apply w-4 h-4 flex-shrink-0;
+}
+
+.file-browser {
+  @apply relative overflow-y-auto;
+  max-height: calc(100vh - 3.5rem);
 }
 
 ::-webkit-scrollbar {
@@ -52,52 +60,103 @@ html {
   @apply bg-base-content/20;
 }
 
-.file-browser {
-  @apply relative overflow-y-auto;
-  max-height: calc(100vh - 12rem);
+.tabs-container {
+  @apply flex border-b;
 }
 
-.file-item {
-  @apply cursor-pointer hover:bg-base-200 p-2 rounded flex items-center gap-2 transition-colors;
+.tab {
+  @apply px-4 py-2 border-b-2 border-transparent hover:bg-base-200 cursor-pointer transition-colors duration-200;
 }
 
-.file-item svg {
-  @apply w-4 h-4 flex-shrink-0;
+.tab.active {
+  @apply border-primary;
+}
+
+textarea {
+  @apply w-full h-full resize-none focus:outline-none font-mono;
+  font-family: var(--editor-font);
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.toast {
+  @apply fixed bottom-4 right-4 z-50 shadow-lg;
+}
+
+.editor-header {
+  @apply flex items-center justify-between px-4 py-2 border-b bg-base-200;
+}
+
+.editor-footer {
+  @apply flex items-center justify-between px-4 py-2 border-t bg-base-200;
+}
+
+.preview-header {
+  @apply px-4 py-2 border-b bg-base-200 font-semibold;
+}
+
+.file-browser-header {
+  @apply px-4 py-2 border-b bg-base-200 font-semibold;
+}
+
+.markdown-content {
+  @apply prose prose-sm max-w-none;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  @apply scroll-mt-20;
+}
+
+.markdown-content a {
+  @apply text-primary hover:text-primary/80;
+}
+
+.markdown-content code {
+  @apply bg-base-200 px-1 py-0.5 rounded;
+}
+
+.markdown-content pre {
+  @apply bg-base-200;
+}
+
+.loading-overlay {
+  @apply absolute inset-0 flex items-center justify-center bg-base-100/80;
+}
+
+.btn-group {
+  @apply flex items-center gap-2;
+}
+
+.badge-group {
+  @apply flex items-center gap-1;
 }
 
 .editor-layout {
   @apply grid grid-cols-12 gap-6;
-  min-height: calc(100vh - 16rem);
+  height: calc(100vh - 3.5rem);
 }
 
 .editor-sidebar {
-  @apply col-span-12 md:col-span-3 border rounded-lg p-4;
+  @apply col-span-2 border rounded-lg p-4;
 }
 
 .editor-main {
-  @apply col-span-12 md:col-span-9;
+  @apply col-span-10;
 }
 
-.modal, .dropdown-content {
+.modal-overlay {
+  @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
+}
+
+.modal-content {
+  @apply bg-base-100 rounded-lg shadow-xl max-w-md w-full mx-4;
+}
+
+.dropdown-content {
   @apply z-50;
-}
-
-.content-area {
-  @apply relative overflow-x-hidden;
-}
-
-.navbar {
-  @apply sticky top-0 z-40 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/60;
-}
-
-.file-type-badge {
-  @apply px-2 py-0.5 rounded text-xs font-medium;
-}
-
-.file-type-md {
-  @apply bg-neutral text-neutral-content;
-}
-
-.file-type-mdx {
-  @apply bg-primary text-primary-content;
 }

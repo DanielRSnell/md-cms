@@ -10,6 +10,7 @@ class FileEditor {
     this.preview = document.getElementById('preview');
     this.saveBtn = document.getElementById('save-btn');
     this.formatBtn = document.getElementById('format-btn');
+    this.currentTab = 'markdown';
     
     marked.setOptions({
       breaks: true,
@@ -28,6 +29,7 @@ class FileEditor {
   init() {
     this.setupEventListeners();
     this.loadContents();
+    this.setupTabSystem();
   }
 
   setupEventListeners() {
@@ -62,6 +64,45 @@ class FileEditor {
 
     if (this.frontMatterArea) {
       this.frontMatterArea.addEventListener('input', () => this.updatePreview());
+      this.frontMatterArea.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = this.frontMatterArea.selectionStart;
+          const end = this.frontMatterArea.selectionEnd;
+          this.frontMatterArea.value = this.frontMatterArea.value.substring(0, start) + '  ' + 
+                                     this.frontMatterArea.value.substring(end);
+          this.frontMatterArea.selectionStart = this.frontMatterArea.selectionEnd = start + 2;
+        }
+      });
+    }
+  }
+
+  setupTabSystem() {
+    document.querySelectorAll('[data-tab]').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchTab(tab.dataset.tab);
+      });
+    });
+  }
+
+  switchTab(tab) {
+    this.currentTab = tab;
+    
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('tab-active');
+      if (t.dataset.tab === tab) {
+        t.classList.add('tab-active');
+      }
+    });
+
+    document.getElementById('frontmatter-editor').classList.toggle('hidden', tab !== 'frontmatter');
+    document.getElementById('markdown-editor').classList.toggle('hidden', tab !== 'markdown');
+
+    if (tab === 'frontmatter') {
+      this.frontMatterArea.focus();
+    } else {
+      this.contentArea.focus();
     }
   }
 
@@ -140,7 +181,8 @@ class FileEditor {
     if (item.name.endsWith('.md') || item.name.endsWith('.mdx')) {
       const isMDX = item.name.endsWith('.mdx');
       return `
-        <div class="file-item" onclick="fileEditor.loadFile('${relativePath}')">
+        <div class="file-item ${this.currentFile?.path === item.path ? 'active' : ''}" 
+             onclick="fileEditor.loadFile('${relativePath}')">
           <svg class="w-4 h-4 ${isMDX ? 'text-primary' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -216,7 +258,11 @@ class FileEditor {
       this.contentArea.value = content || '';
       this.frontMatterArea.value = JSON.stringify(frontMatter || {}, null, 2);
       
+      this.switchTab('markdown');
       this.updatePreview();
+      
+      // Refresh file tree to show active file
+      this.loadContents(this.currentPath);
     } catch (error) {
       console.error('Error loading file:', error);
       this.showToast(error.message, 'error');

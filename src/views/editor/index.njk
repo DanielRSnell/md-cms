@@ -1,84 +1,90 @@
-{% extends "layouts/base.njk" %}
-
-{% block content %}
-<div class="container mx-auto px-4 py-6">
-  <div class="flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-2xl font-bold">{{ project.name }}</h1>
-      {% if project.description %}
-        <p class="text-base-content/70">{{ project.description }}</p>
-      {% endif %}
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="badge badge-primary">{{ project.repository }}</div>
-      <div class="badge">{{ project.content_directory }}</div>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-12 gap-6">
-    <!-- File Browser -->
-    <div class="col-span-12 md:col-span-3">
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body">
-          <h2 class="card-title text-lg">Files</h2>
-          <div id="file-browser" class="mt-4">
-            <div class="loading loading-spinner loading-lg"></div>
-          </div>
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project.name }} - Markdown CMS</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    <div class="h-screen flex flex-col">
+        <div class="border-b bg-base-100 px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="/dashboard" class="btn btn-ghost gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Dashboard
+                </a>
+                <div class="text-lg font-semibold">{{ project.name }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="save-btn" class="btn btn-primary gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    Save
+                </button>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Editor -->
-    <div class="col-span-12 md:col-span-9">
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body">
-          <!-- Welcome Screen -->
-          <div id="welcome-screen">
-            <div class="text-center py-16">
-              <h3 class="text-xl font-bold mb-4">Select a file to edit</h3>
-              <p class="text-base-content/70">Choose a markdown file from the file browser to start editing.</p>
-            </div>
-          </div>
-
-          <!-- Editor Container -->
-          <div id="editor-container" class="hidden space-y-6">
-            <!-- Front Matter Editor -->
-            <div>
-              <h3 class="text-lg font-bold mb-2">Front Matter</h3>
-              <textarea id="frontmatter" class="textarea textarea-bordered w-full h-32 font-mono text-sm"></textarea>
-            </div>
-
-            <!-- Content Editor -->
-            <div>
-              <h3 class="text-lg font-bold mb-2">Content</h3>
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <textarea id="content" class="textarea textarea-bordered w-full h-[500px] font-mono text-sm"></textarea>
+        <div class="flex-1 flex overflow-hidden">
+            <div class="w-64 border-r bg-base-100 flex flex-col">
+                <div class="p-4 border-b font-semibold flex items-center justify-between">
+                    <span>Files</span>
+                    <div class="badge badge-primary">{{ project.repository }}</div>
                 </div>
-                <div>
-                  <div id="preview" class="prose bg-base-200 p-4 rounded-lg overflow-auto h-[500px]"></div>
+                <div id="file-browser" class="flex-1 overflow-y-auto p-2">
+                    <div class="loading loading-spinner loading-lg"></div>
                 </div>
-              </div>
             </div>
 
-            <!-- Actions -->
-            <div class="flex justify-end gap-2">
-              <button id="format-btn" class="btn btn-ghost">Format</button>
-              <button id="save-btn" class="btn btn-primary">Save Changes</button>
+            <div class="flex-1 flex flex-col">
+                <div id="welcome-screen" class="flex-1 flex items-center justify-center">
+                    <div class="text-center">
+                        <h3 class="text-xl font-bold mb-4">Select a file to edit</h3>
+                        <p class="text-base-content/70">Choose a markdown file from the file browser to start editing.</p>
+                    </div>
+                </div>
+
+                <div id="editor-container" class="hidden flex-1 flex">
+                    <div class="flex-1 flex flex-col border-r">
+                        <div class="border-b bg-base-200">
+                            <div class="tabs">
+                                <a class="tab tab-bordered" data-tab="frontmatter" onclick="fileEditor.switchTab('frontmatter')">Front Matter</a>
+                                <a class="tab tab-bordered tab-active" data-tab="markdown" onclick="fileEditor.switchTab('markdown')">Markdown</a>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 flex">
+                            <div id="frontmatter-editor" class="hidden flex-1 flex flex-col">
+                                <textarea id="frontmatter" class="flex-1 font-mono text-sm p-4 bg-base-100 resize-none" spellcheck="false"></textarea>
+                                <div class="p-2 bg-base-200 border-t">
+                                    <button id="format-btn" class="btn btn-sm btn-ghost">Format JSON</button>
+                                </div>
+                            </div>
+
+                            <div id="markdown-editor" class="flex-1 flex flex-col">
+                                <textarea id="content" class="flex-1 font-mono text-sm p-4 bg-base-100 resize-none" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-1/2 flex flex-col">
+                        <div class="border-b bg-base-200 p-3 font-semibold">Preview</div>
+                        <div id="preview" class="flex-1 overflow-y-auto p-4 prose prose-sm max-w-none bg-base-100"></div>
+                    </div>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script>
-  // Initialize project info
-  window.selectedRepo = '{{ project.repository }}';
-  window.projectId = '{{ project.id }}';
-  window.contentDirectory = '{{ project.content_directory }}';
-</script>
-<script src="/js/fileEditor.js"></script>
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        window.selectedRepo = '{{ project.repository }}';
+        window.projectId = '{{ project.id }}';
+        window.contentDirectory = '{{ project.content_directory }}';
+    </script>
+    <script src="/js/fileEditor.js"></script>
+</body>
+</html>
