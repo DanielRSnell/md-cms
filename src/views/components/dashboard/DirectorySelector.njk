@@ -1,6 +1,8 @@
+{% set selectedRepo = user.selected_repo %}
+
 <div id="directory-selector" class="space-y-4">
-    <div class="alert alert-info shadow-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+    <div class="shadow-lg alert alert-info">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
@@ -21,7 +23,7 @@
                 <span class="label-text">Project Name</span>
                 <span class="label-text-alt text-error">Required</span>
             </label>
-            <input type="text" id="project-name" class="input input-bordered w-full" placeholder="My Project">
+            <input type="text" id="project-name" class="w-full input input-bordered" placeholder="My Project">
         </div>
 
         <div class="form-control">
@@ -29,17 +31,17 @@
                 <span class="label-text">Description</span>
                 <span class="label-text-alt">Optional</span>
             </label>
-            <textarea id="project-description" class="textarea textarea-bordered h-24" placeholder="Project description..."></textarea>
+            <textarea id="project-description" class="h-24 textarea textarea-bordered" placeholder="Project description..."></textarea>
         </div>
 
         <div class="form-control">
             <label class="label">
                 <span class="label-text">Selected Directory</span>
             </label>
-            <input type="text" id="content-path" class="input input-bordered w-full" readonly>
+            <input type="text" id="content-path" class="w-full input input-bordered" readonly>
         </div>
 
-        <button onclick="createProject()" class="btn btn-primary w-full">
+        <button id="create-project-btn" onclick="createProject()" class="w-full btn btn-primary">
             Create Project
         </button>
     </div>
@@ -47,18 +49,22 @@
 
 <script>
 let currentPath = '';
-let selectedRepo = '<%= locals.user.selected_repo %>';
+let selectedRepo = '{{ selectedRepo }}';
+let isLoading = false;
 
 async function loadContents(path = '') {
+    if (isLoading) return;
+    isLoading = true;
+
     const browser = document.getElementById('file-browser');
-    browser.innerHTML = '<div class="loading loading-spinner loading-lg"></div>';
+    browser.innerHTML = '<div class="flex items-center justify-center h-full"><div class="loading loading-spinner loading-lg"></div></div>';
 
     try {
         const [owner, repo] = selectedRepo.split('/');
         const response = await fetch(`/github/files/contents/${owner}/${repo}/${path}`);
         
         if (!response.ok) {
-            throw new Error('Failed to load contents');
+            throw new Error(`Failed to load contents: ${response.statusText}`);
         }
         
         const contents = await response.json();
@@ -66,7 +72,7 @@ async function loadContents(path = '') {
         
         browser.innerHTML = `
             ${path ? `
-                <div class="cursor-pointer hover:bg-base-200 p-2 rounded flex items-center mb-4" 
+                <div class="flex items-center p-2 mb-4 rounded cursor-pointer hover:bg-base-200" 
                      onclick="loadContents('${path.split('/').slice(0, -1).join('/')}')">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -84,7 +90,7 @@ async function loadContents(path = '') {
                     .map(item => {
                         if (item.type === 'dir') {
                             return `
-                                <div class="cursor-pointer hover:bg-base-200 p-2 rounded flex items-center justify-between group" 
+                                <div class="flex items-center justify-between p-2 rounded cursor-pointer hover:bg-base-200 group" 
                                      onclick="loadContents('${item.path}')">
                                     <div class="flex items-center">
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,17 +100,16 @@ async function loadContents(path = '') {
                                         ${item.name}
                                     </div>
                                     <button onclick="selectDirectory('${item.path}'); event.stopPropagation();" 
-                                            class="btn btn-primary btn-sm opacity-0 group-hover:opacity-100">
+                                            class="opacity-0 btn btn-primary btn-sm group-hover:opacity-100">
                                         Select Directory
                                     </button>
                                 </div>
                             `;
                         }
-                        // Show markdown and MDX files but make them non-selectable
                         if (item.name.endsWith('.md') || item.name.endsWith('.mdx')) {
                             const isMDX = item.name.endsWith('.mdx');
                             return `
-                                <div class="p-2 rounded flex items-center text-base-content/70">
+                                <div class="flex items-center p-2 rounded text-base-content/70">
                                     <svg class="w-4 h-4 mr-2 ${isMDX ? 'text-primary' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -124,36 +129,46 @@ async function loadContents(path = '') {
         console.error('Error loading contents:', error);
         browser.innerHTML = `
             <div class="alert alert-error">
-                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                           d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
                     <h3 class="font-bold">Error</h3>
-                    <div class="text-sm">Failed to load repository contents</div>
+                    <div class="text-sm">Failed to load repository contents: ${error.message}</div>
                 </div>
                 <button onclick="loadContents('${currentPath}')" class="btn btn-sm">Retry</button>
             </div>
         `;
+    } finally {
+        isLoading = false;
     }
 }
 
 function selectDirectory(path) {
     document.getElementById('content-path').value = path;
     document.getElementById('project-form').classList.remove('hidden');
-    // Scroll to the form
     document.getElementById('project-form').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function createProject() {
-    const name = document.getElementById('project-name').value.trim();
-    const description = document.getElementById('project-description').value.trim();
-    const contentDirectory = document.getElementById('content-path').value;
+    const nameInput = document.getElementById('project-name');
+    const descriptionInput = document.getElementById('project-description');
+    const contentPathInput = document.getElementById('content-path');
+    const createButton = document.getElementById('create-project-btn');
+
+    const name = nameInput.value.trim();
+    const description = descriptionInput.value.trim();
+    const contentDirectory = contentPathInput.value;
 
     if (!name) {
-        alert('Project name is required');
+        showToast('Project name is required', 'error');
+        nameInput.focus();
         return;
     }
+
+    createButton.disabled = true;
+    createButton.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Creating...';
 
     try {
         const response = await fetch('/projects', {
@@ -170,15 +185,39 @@ async function createProject() {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to create project');
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create project');
         }
 
-        window.location.reload();
+        showToast('Project created successfully', 'success');
+        setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
         console.error('Error creating project:', error);
-        alert('Failed to create project');
+        showToast(`Failed to create project: ${error.message}`, 'error');
+    } finally {
+        createButton.disabled = false;
+        createButton.innerHTML = 'Create Project';
     }
 }
 
-loadContents();
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} fixed bottom-4 right-4 w-auto max-w-sm z-50`;
+    toast.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.5s ease-out';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadContents();
+});
 </script>

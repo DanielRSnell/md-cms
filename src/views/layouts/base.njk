@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= locals.title || 'Markdown CMS' %></title>
+    <title>{{ title | default('Markdown CMS') }}</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="min-h-screen bg-base-100">
@@ -14,15 +14,15 @@
                     <a href="/" class="text-xl font-bold">Markdown CMS</a>
                 </div>
                 <div class="flex-none gap-4">
-                    <% if (locals.user) { %>
+                    {% if user %}
                         <a href="/dashboard" class="btn btn-ghost">Dashboard</a>
                         <div class="dropdown dropdown-end">
                             <label tabindex="0" class="btn btn-ghost">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-sm"><%= user.email %></span>
-                                    <% if (user.github_username) { %>
-                                        <div class="badge badge-sm">@<%= user.github_username %></div>
-                                    <% } %>
+                                    <span class="text-sm">{{ user.email }}</span>
+                                    {% if user.github_username %}
+                                        <div class="badge badge-sm">@{{ user.github_username }}</div>
+                                    {% endif %}
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
@@ -30,36 +30,36 @@
                             </label>
                             <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
                                 <li><a href="/dashboard">Dashboard</a></li>
-                                <% if (user.github_id) { %>
+                                {% if user.github_id %}
                                     <li>
                                         <a href="#" onclick="disconnectGitHub(); return false;">
                                             Disconnect GitHub
                                         </a>
                                     </li>
-                                <% } else { %>
+                                {% else %}
                                     <li>
                                         <a href="/github/connect">
                                             Connect GitHub
                                         </a>
                                     </li>
-                                <% } %>
+                                {% endif %}
                                 <div class="divider my-0"></div>
                                 <li><a href="/auth/logout">Logout</a></li>
                             </ul>
                         </div>
-                    <% } else { %>
+                    {% else %}
                         <a href="/auth/login" class="btn btn-ghost">Login</a>
                         <a href="/auth/signup" class="btn btn-primary">Sign up</a>
-                    <% } %>
+                    {% endif %}
                 </div>
             </div>
         </nav>
         <main class="flex-1 relative">
-            <%- content %>
+            {% block content %}{% endblock %}
         </main>
         <footer class="footer footer-center p-4 bg-base-200 text-base-content mt-auto">
             <div>
-                <p>© <%= new Date().getFullYear() %> Markdown CMS</p>
+                <p>© {{ '' | currentYear }} Markdown CMS</p>
             </div>
         </footer>
     </div>

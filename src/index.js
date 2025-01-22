@@ -4,6 +4,7 @@ import session from 'express-session';
 import SQLiteStore from 'connect-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import nunjucks from 'nunjucks';
 import { authRouter } from './routes/auth.js';
 import { githubRouter } from './routes/github/index.js';
 import { projectsRouter } from './routes/projects.js';
@@ -13,9 +14,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const SQLiteStoreSession = SQLiteStore(session);
 
-// View engine setup
-app.set('view engine', 'ejs');
-app.set('views', join(__dirname, 'views'));
+// Nunjucks setup
+const env = nunjucks.configure('src/views', {
+  autoescape: true,
+  express: app
+});
+
+// Add custom filter for current year
+env.addFilter('currentYear', () => new Date().getFullYear());
+
+app.set('view engine', 'njk');
 
 // Middleware
 app.use(express.static(join(__dirname, 'public')));
@@ -51,7 +59,7 @@ app.get('/', (req, res) => {
   if (req.session.user) {
     return res.redirect('/dashboard');
   }
-  res.render('index');
+  res.render('index.njk');
 });
 
 // Auth middleware
@@ -63,7 +71,7 @@ const requireAuth = (req, res, next) => {
 };
 
 app.get('/dashboard', requireAuth, (req, res) => {
-  res.render('dashboard');
+  res.render('dashboard.njk');
 });
 
 // Route handlers
@@ -74,13 +82,13 @@ app.use('/projects', projectsRouter);
 // 404 handler
 app.use((req, res) => {
   console.log('404 Not Found:', req.method, req.url);
-  res.status(404).render('404');
+  res.status(404).render('404.njk');
 });
 
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).render('error', { 
+  res.status(500).render('error.njk', { 
     error: process.env.NODE_ENV === 'production' 
       ? 'Something went wrong!' 
       : err.message,
