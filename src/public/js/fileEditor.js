@@ -59,6 +59,10 @@ class FileEditor {
         }
       });
     }
+
+    if (this.frontMatterArea) {
+      this.frontMatterArea.addEventListener('input', () => this.updatePreview());
+    }
   }
 
   async loadContents(path = '') {
@@ -206,21 +210,17 @@ class FileEditor {
       const { content, frontMatter, sha, type } = await response.json();
       this.currentFile = { path: fullPath, sha, type };
       
-      // Show editor, hide welcome screen
       this.welcomeScreen.classList.add('hidden');
       this.editor.classList.remove('hidden');
 
-      // Set content and front matter
       this.contentArea.value = content || '';
       this.frontMatterArea.value = JSON.stringify(frontMatter || {}, null, 2);
       
-      // Update preview
       this.updatePreview();
     } catch (error) {
       console.error('Error loading file:', error);
       this.showToast(error.message, 'error');
       
-      // Show welcome screen on error
       this.welcomeScreen.classList.remove('hidden');
       this.editor.classList.add('hidden');
     }
@@ -256,7 +256,7 @@ class FileEditor {
       try {
         frontMatter = JSON.parse(this.frontMatterArea.value);
       } catch (e) {
-        throw new Error('Invalid front matter JSON format');
+        throw new Error('Invalid JSON in front matter');
       }
 
       const response = await fetch('/github/files/save', {

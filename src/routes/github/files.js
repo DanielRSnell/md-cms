@@ -6,6 +6,70 @@ import { Buffer } from 'buffer';
 
 const router = Router();
 
+function parseFrontMatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) return { frontMatter: {}, content };
+
+  const [, frontMatterStr, mainContent] = match;
+  const frontMatter = {};
+
+  // Parse front matter lines
+  frontMatterStr.split('\n').forEach(line => {
+    const [key, ...valueParts] = line.split(':');
+    if (!key || !valueParts.length) return;
+
+    let value = valueParts.join(':').trim();
+    
+    // Handle arrays
+    if (value.startsWith('[') && value.endsWith(']')) {
+      try {
+        value = value.slice(1, -1).split(',').map(v => v.trim());
+      } catch (e) {
+        console.warn('Failed to parse array:', value);
+      }
+    }
+    // Handle numbers
+    else if (!isNaN(value)) {
+      value = Number(value);
+    }
+    // Handle booleans
+    else if (value === 'true') {
+      value = true;
+    }
+    else if (value === 'false') {
+      value = false;
+    }
+    // Handle quoted strings
+    else if ((value.startsWith('"') && value.endsWith('"')) || 
+             (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    frontMatter[key.trim()] = value;
+  });
+
+  return {
+    frontMatter,
+    content: mainContent.trim()
+  };
+}
+
+function stringifyFrontMatter(frontMatter) {
+  if (!frontMatter || Object.keys(frontMatter).length === 0) return '';
+
+  const lines = Object.entries(frontMatter).map(([key, value]) => {
+    if (Array.isArray(value)) {
+      return `${key}: [${value.join(', ')}]`;
+    }
+    if (typeof value === 'string' && (value.includes(':') || value.includes('"'))) {
+      return `${key}: "${value}"`;
+    }
+    return `${key}: ${value}`;
+  });
+
+  return `---\n${lines.join('\n')}\n---\n\n`;
+}
+
 router.get('/contents/:owner/:repo/*', requireAuth, requireGitHub, async (req, res) => {
   const { owner, repo } = req.params;
   const path = req.params[0] || '';
@@ -73,26 +137,11 @@ router.get('/file/:owner/:repo/*', requireAuth, requireGitHub, async (req, res) 
       throw new Error('Not a file');
     }
 
-    const content = Buffer.from(response.data.content, 'base64').toString('utf8');
-    
-    let frontMatter = {};
-    let mainContent = content;
-
-    const frontMatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
-    const match = content.match(frontMatterRegex);
-    
-    if (match) {
-      try {
-        frontMatter = JSON.parse(match[1].trim());
-        mainContent = match[2].trim();
-      } catch (e) {
-        console.warn('Failed to parse front matter:', e);
-        mainContent = content;
-      }
-    }
+    const fileContent = Buffer.from(response.data.content, 'base64').toString('utf8');
+    const { frontMatter, content } = parseFrontMatter(fileContent);
 
     res.json({
-      content: mainContent,
+      content,
       frontMatter,
       sha: response.data.sha,
       path: response.data.path,
@@ -121,7 +170,7 @@ router.post('/save', requireAuth, requireGitHub, async (req, res) => {
     const repo = pathParts[1];
     const filePath = pathParts.slice(2).join('/');
 
-    const fileContent = `---\n${JSON.stringify(frontMatter, null, 2)}\n---\n\n${content}`;
+    const fileContent = stringifyFrontMatter(frontMatter) + content;
     const encodedContent = Buffer.from(fileContent).toString('base64');
 
     const response = await githubApi.put(`/repos/${owner}/${repo}/contents/${filePath}`, {
