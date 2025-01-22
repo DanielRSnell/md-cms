@@ -42,17 +42,23 @@ router.post('/select', requireAuth, requireGitHub, async (req, res) => {
   }
 
   try {
+    // Verify repository access
     await githubApi.get(`/repos/${repo}`, {
       headers: {
         Authorization: `Bearer ${req.githubToken}`,
       },
     });
 
+    // Update user record with selected repo
     await dbRun(
       'UPDATE users SET selected_repo = ?, content_directory = NULL WHERE id = ?',
       [repo, req.session.user.id]
     );
+
+    // Get updated user data
+    const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.user.id]);
     
+    // Update session with new repo info
     req.session.user = {
       ...req.session.user,
       selected_repo: repo,
@@ -105,17 +111,20 @@ router.post('/set-content-directory', requireAuth, requireGitHub, async (req, re
       throw new Error('No repository selected');
     }
 
+    // Verify directory exists
     await githubApi.get(`/repos/${user.selected_repo}/contents/${directory}`, {
       headers: {
         Authorization: `Bearer ${req.githubToken}`,
       },
     });
 
+    // Update user record
     await dbRun(
       'UPDATE users SET content_directory = ? WHERE id = ?',
       [directory, req.session.user.id]
     );
     
+    // Update session
     req.session.user = {
       ...req.session.user,
       content_directory: directory

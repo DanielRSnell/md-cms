@@ -16,7 +16,7 @@ db.serialize(() => {
   db.run('DROP TABLE IF EXISTS magic_links');
   db.run('DROP TABLE IF EXISTS users');
 
-  // Create users table
+  // Create users table with selected_repo and content_directory columns
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -27,7 +27,9 @@ db.serialize(() => {
       verified BOOLEAN DEFAULT FALSE,
       github_id TEXT UNIQUE,
       github_username TEXT,
-      github_access_token TEXT
+      github_access_token TEXT,
+      selected_repo TEXT,
+      content_directory TEXT
     )
   `);
 

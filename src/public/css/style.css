@@ -3100,6 +3100,10 @@ html {
   margin-bottom: 1.5rem;
 }
 
+.ml-2 {
+  margin-left: 0.5rem;
+}
+
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -3409,6 +3413,10 @@ html {
 
 .text-base-content\/50 {
   color: var(--fallback-bc,oklch(var(--bc)/0.5));
+}
+
+.text-base-content\/70 {
+  color: var(--fallback-bc,oklch(var(--bc)/0.7));
 }
 
 .text-error {

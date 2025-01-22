@@ -9,7 +9,7 @@
         </div>
     </div>
     
-    <div id="file-browser" class="border rounded-lg p-4 min-h-[300px]">
+    <div id="file-browser" class="border rounded-lg p-4 min-h-[300px] overflow-y-auto max-h-[calc(100vh-20rem)]">
         <div class="loading loading-spinner loading-lg"></div>
     </div>
 
@@ -34,7 +34,7 @@
 
         <div class="form-control">
             <label class="label">
-                <span class="label-text">Content Directory</span>
+                <span class="label-text">Selected Directory</span>
             </label>
             <input type="text" id="content-path" class="input input-bordered w-full" readonly>
         </div>
@@ -100,6 +100,22 @@ async function loadContents(path = '') {
                                 </div>
                             `;
                         }
+                        // Show markdown and MDX files but make them non-selectable
+                        if (item.name.endsWith('.md') || item.name.endsWith('.mdx')) {
+                            const isMDX = item.name.endsWith('.mdx');
+                            return `
+                                <div class="p-2 rounded flex items-center text-base-content/70">
+                                    <svg class="w-4 h-4 mr-2 ${isMDX ? 'text-primary' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    ${item.name}
+                                    <span class="ml-2 badge badge-sm ${isMDX ? 'badge-primary' : 'badge-ghost'}">
+                                        ${isMDX ? 'MDX' : 'MD'}
+                                    </span>
+                                </div>
+                            `;
+                        }
                         return '';
                     }).join('')}
             </div>
@@ -110,7 +126,7 @@ async function loadContents(path = '') {
             <div class="alert alert-error">
                 <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 01-18 0z" />
+                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
                     <h3 class="font-bold">Error</h3>
@@ -125,6 +141,8 @@ async function loadContents(path = '') {
 function selectDirectory(path) {
     document.getElementById('content-path').value = path;
     document.getElementById('project-form').classList.remove('hidden');
+    // Scroll to the form
+    document.getElementById('project-form').scrollIntoView({ behavior: 'smooth' });
 }
 
 async function createProject() {
