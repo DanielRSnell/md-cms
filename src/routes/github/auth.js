@@ -4,6 +4,18 @@ import { dbGet, dbRun } from '../../db.js';
 
 const router = Router();
 
+// Add this new route at the beginning of the file
+router.get('/connect', (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/auth/login');
+  }
+
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.BASE_URL + '/github/auth/callback')}&scope=repo&state=${req.session.user.id}`;
+  res.redirect(githubAuthUrl);
+});
+
+// Existing routes...
+
 router.get('/callback', async (req, res) => {
   const { code, state } = req.query;
 
